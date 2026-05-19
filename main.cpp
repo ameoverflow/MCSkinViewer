@@ -6,8 +6,7 @@
 
 int skinType = 0;
 bool freeCam = false;
-std::string skinPath = "default";
-Texture2D custom;
+Skin custom;
 char username[17] = "";
 Model classicModel, slimModel;
 Camera camera;
@@ -45,11 +44,10 @@ void runImGui() {
     if (ImGui::Button("Get", ImVec2(64, 0)) || inputSubmitted)
     {
         custom = MinecraftSkin::LoadSkinFromMinecraft(username);
-        if (custom.id > 0) {
-            skinPath = "Minecraft username";
+        if (custom.texture.id > 0) {
             SetWindowTitle(std::string("Skin viewer | Minecraft: " + std::string(username)).c_str());
-            SetMaterialTexture(&classicModel.materials[1], MATERIAL_MAP_DIFFUSE, custom);
-            SetMaterialTexture(&slimModel.materials[1], MATERIAL_MAP_DIFFUSE, custom);
+            SetMaterialTexture(&classicModel.materials[1], MATERIAL_MAP_DIFFUSE, custom.texture);
+            SetMaterialTexture(&slimModel.materials[1], MATERIAL_MAP_DIFFUSE, custom.texture);
         }
     }
 
@@ -57,6 +55,13 @@ void runImGui() {
 
     ImGui::RadioButton("Steve Model (Classic)", &skinType, 0);
     ImGui::RadioButton("Alex Model (Slim)", &skinType, 1);
+
+    if (custom.texture.id > 0) {
+        ImGui::Separator();
+
+        ImGui::Text("Custom skin");
+        ImGui::Text("Skin type: %s", custom.isOldType ? "Pre-1.8" : "1.8+");
+    }
 
     ImGui::End();
 
@@ -107,23 +112,22 @@ int main(int argc, char* argv[])
     classicModel.materials[1].shader = alphaShader;
     slimModel.materials[1].shader = alphaShader;
 
-    Texture2D steveTexture = MinecraftSkin::LoadSkinTexture("assets/steve.png");
-    Texture2D alexTexture = MinecraftSkin::LoadSkinTexture("assets/alex.png");
+    Texture2D steveTexture = MinecraftSkin::LoadSkinTexture("assets/steve.png").texture;
+    Texture2D alexTexture = MinecraftSkin::LoadSkinTexture("assets/alex.png").texture;
     SetMaterialTexture(&classicModel.materials[1], MATERIAL_MAP_DIFFUSE, steveTexture);
     SetMaterialTexture(&slimModel.materials[1], MATERIAL_MAP_DIFFUSE, alexTexture);
 
     if (argc > 1) {
-        skinPath = argv[1];
-        if (IsFileExtension(skinPath.c_str(), "png")) {
-            Image skin = LoadImage(skinPath.c_str());
+        if (IsFileExtension(argv[1], "png")) {
+            Image skin = LoadImage(argv[1]);
 
             if (skin.width != 64 && skin.height != 64 && skin.height != 32) {
                 invalidSizePopup = true;
             } else {
-                custom = MinecraftSkin::LoadSkinTexture(skinPath);
-                SetWindowTitle(std::string("Skin viewer | " + skinPath).c_str());
-                SetMaterialTexture(&classicModel.materials[1], MATERIAL_MAP_DIFFUSE, custom);
-                SetMaterialTexture(&slimModel.materials[1], MATERIAL_MAP_DIFFUSE, custom);
+                custom = MinecraftSkin::LoadSkinTexture(argv[1]);
+                SetWindowTitle(std::string("Skin viewer | " + std::string(argv[1])).c_str());
+                SetMaterialTexture(&classicModel.materials[1], MATERIAL_MAP_DIFFUSE, custom.texture);
+                SetMaterialTexture(&slimModel.materials[1], MATERIAL_MAP_DIFFUSE, custom.texture);
             }
             UnloadImage(skin);
         } else {
@@ -136,18 +140,16 @@ int main(int argc, char* argv[])
         if (IsFileDropped()) {
             FilePathList list = LoadDroppedFiles();
             if (IsFileExtension(list.paths[0], "png")) {
-                UnloadTexture(custom);
-                skinPath = list.paths[0];
-
-                Image skin = LoadImage(skinPath.c_str());
+                Image skin = LoadImage(list.paths[0]);
 
                 if (skin.width != 64 && skin.height != 64 && skin.height != 32) {
                     invalidSizePopup = true;
                 } else {
-                    custom = MinecraftSkin::LoadSkinTexture(skinPath);
-                    SetWindowTitle(std::string("Skin viewer | " + skinPath).c_str());
-                    SetMaterialTexture(&classicModel.materials[1], MATERIAL_MAP_DIFFUSE, custom);
-                    SetMaterialTexture(&slimModel.materials[1], MATERIAL_MAP_DIFFUSE, custom);
+                    UnloadTexture(custom.texture);
+                    custom = MinecraftSkin::LoadSkinTexture(list.paths[0]);
+                    SetWindowTitle(std::string("Skin viewer | " + std::string(list.paths[0])).c_str());
+                    SetMaterialTexture(&classicModel.materials[1], MATERIAL_MAP_DIFFUSE, custom.texture);
+                    SetMaterialTexture(&slimModel.materials[1], MATERIAL_MAP_DIFFUSE, custom.texture);
                 }
                 UnloadImage(skin);
             } else {
@@ -191,7 +193,7 @@ int main(int argc, char* argv[])
     UnloadModel(slimModel);
     UnloadTexture(steveTexture);
     UnloadTexture(alexTexture);
-    UnloadTexture(custom);
+    UnloadTexture(custom.texture);
     rlImGuiShutdown();
     CloseWindow();
 
