@@ -18,7 +18,7 @@ struct AppState {
     Model classicModel, slimModel;
     Skin steve, alex;
     bool quit;
-    float backgroundColor[3] = {0.2f, 0.2f, 0.2f};
+    float backgroundColor[3] = {0.1f, 0.1f, 0.1f};
     float cameraFov = 45.0f;
 
     bool enabledMeshes[12] = {true, true, true, true, true, true, true, true, true, true, true, true};

@@ -181,9 +181,9 @@ void RunCameraWindow() {
 
         ImGui::ColorPicker3("Viewport background color", State.backgroundColor, ImGuiColorEditFlags_DisplayHex | ImGuiColorEditFlags_DisplayRGB);
         if (ImGui::Button("Reset color to default")) {
-            State.backgroundColor[0] = 0.2f;
-            State.backgroundColor[1] = 0.2f;
-            State.backgroundColor[2] = 0.2f;
+            State.backgroundColor[0] = 0.1f;
+            State.backgroundColor[1] = 0.1f;
+            State.backgroundColor[2] = 0.1f;
         }
 
         ImGui::End();
