@@ -31,7 +31,7 @@ Skin MinecraftSkin::LoadSkinIntoStruct(Image img) {
 bool MinecraftSkin::LoadSkinFromPNG(const std::string& filePath) {
     Image img = LoadImage(filePath.c_str());
 
-    if (img.width != 64 || img.height != 64 || img.height != 32) {
+    if (img.width != 64 || (img.height != 64 && img.height != 32)) {
         UserInterface::ShowInvalidTexturePopup();
         UnloadImage(img);
         return false;
@@ -176,7 +176,7 @@ bool MinecraftSkin::LoadSkinFromURL(const std::string& url) {
 
         Image skinImage = LoadImageFromMemory(".png", (const unsigned char*)result->body.data(), (int)result->body.size());
 
-        if (skinImage.width != 64 || skinImage.height != 64 || skinImage.height != 32) {
+        if (skinImage.width != 64 || (skinImage.height != 64 && skinImage.height != 32)) {
             UserInterface::ShowInvalidTexturePopup();
             UnloadImage(skinImage);
             return false;
