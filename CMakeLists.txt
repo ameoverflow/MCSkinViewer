@@ -11,6 +11,7 @@ set(SOURCES
         imgui/imgui_widgets.cpp
         rlimgui/rlImGui.cpp
         MinecraftSkin.cpp
+        UserInterface.cpp
         main.cpp
 )
 

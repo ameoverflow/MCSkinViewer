@@ -3,30 +3,53 @@
 #include "httplib.h"
 #include "json.hpp"
 #include "base64.hpp"
+#include "State.h"
+#include "UserInterface.h"
 
-Skin MinecraftSkin::LoadSkinTexture(const std::string& filePath) {
-    Image img = LoadImage(filePath.c_str());
-
+Skin MinecraftSkin::LoadSkinIntoStruct(Image img) {
     Skin skin;
 
     if (img.width != 64) {
-        UnloadImage(img);
         return {};
     }
 
     Texture2D returnTexture;
+    skin.original = LoadTextureFromImage(img);
     if (img.height == 32) {
         returnTexture = ConvertImage(img);
         skin.isOldType = true;
-        UnloadImage(img);
     } else if (img.height == 64) {
         skin.isOldType = false;
         returnTexture = LoadTextureFromImage(img);
-        UnloadImage(img);
+    } else {
+        return {};
     }
     skin.texture = returnTexture;
-
     return skin;
+}
+
+bool MinecraftSkin::LoadSkinFromPNG(const std::string& filePath) {
+    Image img = LoadImage(filePath.c_str());
+
+    if (img.width != 64 || img.height != 64 || img.height != 32) {
+        UserInterface::ShowInvalidTexturePopup();
+        UnloadImage(img);
+        return false;
+    }
+
+    Skin skin = LoadSkinIntoStruct(img);
+    UnloadImage(img);
+
+    if (skin.texture.id == 0) return false;
+
+    UnloadTexture(State.loadedSkin.texture);
+
+    SetWindowTitle(std::string("Skin viewer | " + std::string(GetFileName(filePath.c_str()))).c_str());
+    SetMaterialTexture(&State.classicModel.materials[1], MATERIAL_MAP_DIFFUSE, skin.texture);
+    SetMaterialTexture(&State.slimModel.materials[1], MATERIAL_MAP_DIFFUSE, skin.texture);
+    State.loadedSkin = skin;
+
+    return true;
 }
 
 void FlipSkinPart(Image originalImage, Image targetImage, Rectangle sourceRect, Rectangle targetRect) {
@@ -60,8 +83,7 @@ Texture2D MinecraftSkin::ConvertImage(Image img) {
     return LoadTextureFromImage(converted);
 }
 
-Skin MinecraftSkin::LoadSkinFromMinecraft(const std::string& username) {
-    Skin skin;
+bool MinecraftSkin::LoadSkinFromMinecraft(const std::string& username) {
     httplib::Client minecraftApi("https://api.minecraftservices.com");
 
     nlohmann::json buffer;
@@ -76,84 +98,102 @@ Skin MinecraftSkin::LoadSkinFromMinecraft(const std::string& username) {
 
         buffer = nlohmann::json::parse(result->body);
 
-        if (!buffer.contains("id") && !buffer["id"].is_string()) return {};
+        if (!buffer.contains("id") && !buffer["id"].is_string()) return false;
         uuid = buffer["id"].get<std::string>();
     } else {
-        return {};
+        return false;
     }
 
     minecraftApi = httplib::Client("https://sessionserver.mojang.com");
 
     if (httplib::Result result = minecraftApi.Get("/session/minecraft/profile/" + uuid)) {
-        if (result->status == 204 || result->body.size() == 0) return {};
+        if (result->status == 204 || result->body.size() == 0) return false;
 
-        if (!nlohmann::json::accept(result->body)) return {};
+        if (!nlohmann::json::accept(result->body)) return false;
 
         buffer = nlohmann::json::parse(result->body);
 
-        if (!buffer.contains("properties") || !buffer["properties"].is_array()) return {};
+        if (!buffer.contains("properties") || !buffer["properties"].is_array()) return false;
         nlohmann::json properties = buffer["properties"][0];
 
-        if (!properties.contains("value") || !properties["value"].is_string()) return {};
+        if (!properties.contains("value") || !properties["value"].is_string()) return false;
         skinBase64 = properties["value"].get<std::string>();
     } else {
-        return {};
+        return false;
     }
 
     std::string skinJson = base64::from_base64(skinBase64);
 
-    if (!nlohmann::json::accept(skinJson)) return {};
+    if (!nlohmann::json::accept(skinJson)) return false;
 
     buffer = nlohmann::json::parse(skinJson);
 
-    if (!buffer.contains("textures") || !buffer["textures"].is_object()) return {};
+    if (!buffer.contains("textures") || !buffer["textures"].is_object()) return false;
     nlohmann::json textures = buffer["textures"];
 
-    if (!textures.contains("SKIN") || !textures["SKIN"].is_object()) return {};
+    if (!textures.contains("SKIN") || !textures["SKIN"].is_object()) return false;
     nlohmann::json skinObject = textures["SKIN"];
 
-    if (!skinObject.contains("url") || !skinObject["url"].is_string()) return {};
-    skinUrl = skinObject["url"].get<std::string>();
+    if (!skinObject.contains("url") || !skinObject["url"].is_string()) return false;
 
-    size_t protocolEnd = skinUrl.find("://");
+    bool loadResult = LoadSkinFromURL(skinObject["url"].get<std::string>());
+    if (!loadResult) return false;
+    SetWindowTitle(std::string("Skin viewer | " + username).c_str());
+
+    return true;
+}
+
+bool MinecraftSkin::LoadSkinFromURL(const std::string& url) {
+    std::string host, path;
+
+    size_t protocolEnd = url.find("://");
     size_t hostStart = (protocolEnd == std::string::npos) ? 0 : protocolEnd + 3;
 
-    size_t pathStart = skinUrl.find("/", hostStart);
+    size_t pathStart = url.find("/", hostStart);
 
     if (pathStart == std::string::npos)
     {
-        skinPath = "/";
+        host = url;
+        path = "/";
     }
     else
     {
-        skinPath = skinUrl.substr(pathStart);
+        host = url.substr(0, pathStart);
+        path = url.substr(pathStart);
     }
 
-    httplib::Client minecraftTextures("http://textures.minecraft.net");
+    httplib::Client skinSource(host);
 
-    if (httplib::Result result = minecraftTextures.Get(skinPath)) {
-        if (result->status == 204 || result->body.size() == 0) return {};
+    if (httplib::Result result = skinSource.Get(path)) {
+        if (result->status == 204 || result->body.size() == 0) return false;
+
+        std::string contentType = result->get_header_value("Content-Type");
+        std::transform(contentType.begin(), contentType.end(), contentType.begin(), ::tolower);
+        if (contentType.find("image/png") == std::string::npos) {
+            UserInterface::ShowInvalidFilePopup();
+            return false;
+        }
 
         Image skinImage = LoadImageFromMemory(".png", (const unsigned char*)result->body.data(), (int)result->body.size());
 
-        if (skinImage.width != 64) {
+        if (skinImage.width != 64 || skinImage.height != 64 || skinImage.height != 32) {
+            UserInterface::ShowInvalidTexturePopup();
             UnloadImage(skinImage);
-            return {};
+            return false;
         }
 
-        Texture2D returnTexture;
-        if (skinImage.height == 32) {
-            returnTexture = ConvertImage(skinImage);
-            skin.isOldType = true;
-            UnloadImage(skinImage);
-        } else if (skinImage.height == 64) {
-            skin.isOldType = false;
-            returnTexture = LoadTextureFromImage(skinImage);
-            UnloadImage(skinImage);
-        }
-        skin.texture = returnTexture;
+        Skin skin = LoadSkinIntoStruct(skinImage);
+        UnloadImage(skinImage);
 
-        return skin;
+        if (skin.texture.id == 0) return false;
+        UnloadTexture(State.loadedSkin.texture);
+
+        SetWindowTitle(std::string("Skin viewer | " + url).c_str());
+        SetMaterialTexture(&State.classicModel.materials[1], MATERIAL_MAP_DIFFUSE, skin.texture);
+        SetMaterialTexture(&State.slimModel.materials[1], MATERIAL_MAP_DIFFUSE, skin.texture);
+        State.loadedSkin = skin;
+        return true;
     }
-    return {};
+
+    return false;
 }

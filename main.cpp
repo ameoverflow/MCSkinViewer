@@ -3,90 +3,8 @@
 #include "imgui/imgui.h"
 #include "rlimgui/rlImGui.h"
 #include "MinecraftSkin.h"
-
-int skinType = 0;
-bool freeCam = false;
-Skin custom;
-char username[17] = "";
-Model classicModel, slimModel;
-Camera camera;
-
-bool invalidFilePopup, invalidSizePopup;
-
-void runImGui() {
-    if (invalidFilePopup) {
-        ImGui::OpenPopup("File Error");
-        invalidFilePopup = false;
-    }
-
-    if (invalidSizePopup) {
-        ImGui::OpenPopup("Texture Error");
-        invalidSizePopup = false;
-    }
-
-    bool open = true;
-    ImGui::Begin("Options", &open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
-
-    if (IsCursorHidden()) {
-        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "-- CURSOR LOCKED --");
-    }
-
-    ImGui::Text("Camera coordinates: ");
-    ImGui::Text("%f %f %f", camera.position.x, camera.position.y, camera.position.z);
-
-    ImGui::Text("Camera target: ");
-    ImGui::Text("%f %f %f", camera.target.x, camera.target.y, camera.target.z);
-
-    ImGui::Separator();
-
-    bool inputSubmitted = ImGui::InputText(" Minecraft username", username, sizeof(username), ImGuiInputTextFlags_EnterReturnsTrue);
-
-    if (ImGui::Button("Get", ImVec2(64, 0)) || inputSubmitted)
-    {
-        custom = MinecraftSkin::LoadSkinFromMinecraft(username);
-        if (custom.texture.id > 0) {
-            SetWindowTitle(std::string("Skin viewer | Minecraft: " + std::string(username)).c_str());
-            SetMaterialTexture(&classicModel.materials[1], MATERIAL_MAP_DIFFUSE, custom.texture);
-            SetMaterialTexture(&slimModel.materials[1], MATERIAL_MAP_DIFFUSE, custom.texture);
-        }
-    }
-
-    ImGui::Separator();
-
-    ImGui::RadioButton("Steve Model (Classic)", &skinType, 0);
-    ImGui::RadioButton("Alex Model (Slim)", &skinType, 1);
-
-    if (custom.texture.id > 0) {
-        ImGui::Separator();
-
-        ImGui::Text("Custom skin");
-        ImGui::Text("Skin type: %s", custom.isOldType ? "Pre-1.8" : "1.8+");
-    }
-
-    ImGui::End();
-
-    if (ImGui::BeginPopupModal("File Error", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-
-        ImGui::Text("Provided file is invalid. It needs to be a .png file.");
-
-        if (ImGui::Button("OK", ImVec2(64, 0))) {
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::EndPopup();
-    }
-
-    if (ImGui::BeginPopupModal("Texture Error", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-
-        ImGui::Text("Texture must be 64x64 or 64x32.");
-
-        if (ImGui::Button("OK", ImVec2(64, 0))) {
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::EndPopup();
-    }
-}
+#include "State.h"
+#include "UserInterface.h"
 
 int main(int argc, char* argv[])
 {
@@ -96,65 +14,52 @@ int main(int argc, char* argv[])
 
     rlImGuiSetup(true);
 
-    camera = { 0 };
-    camera.position = (Vector3){ 3.0f, 3.0f, -3.0f };
-    camera.target = (Vector3){ 0.0f, 1.0f, 0.0f };
-    camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };
-    camera.fovy = 45.0f;
-    camera.projection = CAMERA_PERSPECTIVE;
+    State.camera = { 0 };
+    State.camera.position = (Vector3){ 3.0f, 3.0f, -3.0f };
+    State.camera.target = (Vector3){ 0.0f, 1.0f, 0.0f };
+    State.camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };
+    State.camera.fovy = 45.0f;
+    State.camera.projection = CAMERA_PERSPECTIVE;
 
-    classicModel = LoadModel("assets/player_wide.gltf");
-    slimModel = LoadModel("assets/player_slim.gltf");
+    State.classicModel = LoadModel("assets/player_wide.gltf");
+    State.slimModel = LoadModel("assets/player_slim.gltf");
 
     Vector3 position = { 0.0f, 0.0f, 0.0f };
     Shader alphaShader = LoadShader(0, TextFormat("assets/discard.fs"));
 
-    classicModel.materials[1].shader = alphaShader;
-    slimModel.materials[1].shader = alphaShader;
+    State.classicModel.materials[1].shader = alphaShader;
+    State.slimModel.materials[1].shader = alphaShader;
 
-    Texture2D steveTexture = MinecraftSkin::LoadSkinTexture("assets/steve.png").texture;
-    Texture2D alexTexture = MinecraftSkin::LoadSkinTexture("assets/alex.png").texture;
-    SetMaterialTexture(&classicModel.materials[1], MATERIAL_MAP_DIFFUSE, steveTexture);
-    SetMaterialTexture(&slimModel.materials[1], MATERIAL_MAP_DIFFUSE, alexTexture);
+    Image steveSkin = LoadImage("assets/steve.png");
+    Image alexSkin = LoadImage("assets/alex.png");
+    State.steve = MinecraftSkin::LoadSkinIntoStruct(steveSkin);
+    State.alex = MinecraftSkin::LoadSkinIntoStruct(alexSkin);
+    UnloadImage(steveSkin);
+    UnloadImage(alexSkin);
+
+    SetMaterialTexture(&State.classicModel.materials[1], MATERIAL_MAP_DIFFUSE, State.steve.texture);
+    SetMaterialTexture(&State.slimModel.materials[1], MATERIAL_MAP_DIFFUSE, State.alex.texture);
 
     if (argc > 1) {
         if (IsFileExtension(argv[1], "png")) {
-            Image skin = LoadImage(argv[1]);
-
-            if (skin.width != 64 && skin.height != 64 && skin.height != 32) {
-                invalidSizePopup = true;
-            } else {
-                custom = MinecraftSkin::LoadSkinTexture(argv[1]);
-                SetWindowTitle(std::string("Skin viewer | " + std::string(argv[1])).c_str());
-                SetMaterialTexture(&classicModel.materials[1], MATERIAL_MAP_DIFFUSE, custom.texture);
-                SetMaterialTexture(&slimModel.materials[1], MATERIAL_MAP_DIFFUSE, custom.texture);
+            if (!MinecraftSkin::LoadSkinFromPNG(argv[1])) {
+                UserInterface::ShowInvalidTexturePopup();
             }
-            UnloadImage(skin);
         } else {
-            invalidFilePopup = true;
+            UserInterface::ShowInvalidFilePopup();
         }
     }
 
-    while (!WindowShouldClose())
+    while (!WindowShouldClose() && !State.quit)
     {
         if (IsFileDropped()) {
             FilePathList list = LoadDroppedFiles();
             if (IsFileExtension(list.paths[0], "png")) {
-                Image skin = LoadImage(list.paths[0]);
-
-                if (skin.width != 64 && skin.height != 64 && skin.height != 32) {
-                    invalidSizePopup = true;
-                } else {
-                    UnloadTexture(custom.texture);
-                    custom = MinecraftSkin::LoadSkinTexture(list.paths[0]);
-                    SetWindowTitle(std::string("Skin viewer | " + std::string(list.paths[0])).c_str());
-                    SetMaterialTexture(&classicModel.materials[1], MATERIAL_MAP_DIFFUSE, custom.texture);
-                    SetMaterialTexture(&slimModel.materials[1], MATERIAL_MAP_DIFFUSE, custom.texture);
+                if (!MinecraftSkin::LoadSkinFromPNG(list.paths[0])) {
+                    UserInterface::ShowInvalidTexturePopup();
                 }
-                UnloadImage(skin);
             } else {
-                std::cout << "Invalid file: " << list.paths[0] << std::endl;
-                invalidFilePopup = true;
+                UserInterface::ShowInvalidFilePopup();
             }
             UnloadDroppedFiles(list);
         }
@@ -166,7 +71,7 @@ int main(int argc, char* argv[])
                 }
             }
         } else {
-            UpdateCamera(&camera, CAMERA_FREE);
+            UpdateCamera(&State.camera, CAMERA_FREE);
 
             if (IsKeyPressed(KEY_ESCAPE)) {
                 EnableCursor();
@@ -175,25 +80,25 @@ int main(int argc, char* argv[])
 
         BeginDrawing();
 
-        ClearBackground(DARKGRAY);
-        BeginMode3D(camera);
-        DrawModel(skinType == 1 ? slimModel : classicModel, position, 1.0f, WHITE);
+        ClearBackground({50, 50, 50, 255});
+        BeginMode3D(State.camera);
+        DrawModel(State.isSlim ? State.slimModel : State.classicModel, position, 1.0f, WHITE);
         DrawGrid(10, 1.0f);
         EndMode3D();
 
         rlImGuiBegin();
 
-        runImGui();
+        UserInterface::RunUI();
 
         rlImGuiEnd();
 
         EndDrawing();
     }
-    UnloadModel(classicModel);
-    UnloadModel(slimModel);
-    UnloadTexture(steveTexture);
-    UnloadTexture(alexTexture);
-    UnloadTexture(custom.texture);
+    UnloadModel(State.classicModel);
+    UnloadModel(State.slimModel);
+    UnloadTexture(State.steve.texture);
+    UnloadTexture(State.alex.texture);
+    UnloadTexture(State.loadedSkin.texture);
     rlImGuiShutdown();
     CloseWindow();
 

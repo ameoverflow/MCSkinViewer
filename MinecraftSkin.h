@@ -6,12 +6,15 @@
 struct Skin {
     bool isOldType;
     Texture2D texture;
+    Texture2D original;
 };
 
 namespace MinecraftSkin {
-    Skin LoadSkinTexture(const std::string& path);
+    Skin LoadSkinIntoStruct(Image img);
+    bool LoadSkinFromPNG(const std::string& path);
     Texture2D ConvertImage(Image img);
-    Skin LoadSkinFromMinecraft(const std::string& username);
+    bool LoadSkinFromMinecraft(const std::string& username);
+    bool LoadSkinFromURL(const std::string& url);
 }
 
 #endif //SKINVIEWER_MINECRAFTSKIN_H
