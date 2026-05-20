@@ -1,3 +1,7 @@
+#include <filesystem>
+
+#include "Assets.h"
+#include "base64.hpp"
 #include "raylib.h"
 #include "raymath.h"
 #include "imgui/imgui.h"
@@ -5,6 +9,18 @@
 #include "MinecraftSkin.h"
 #include "State.h"
 #include "UserInterface.h"
+
+Vector3 position = { 0.0f, 0.0f, 0.0f };
+
+std::string GetSystemTempPath() {
+#ifdef _WIN32
+    char tempFolder[MAX_PATH];
+    GetTempPathA(MAX_PATH, tempFolder);
+    return std::string(tempFolder);
+    #else
+    return "/tmp/";
+#endif
+}
 
 int main(int argc, char* argv[])
 {
@@ -21,19 +37,34 @@ int main(int argc, char* argv[])
     State.camera.fovy = 45.0f;
     State.camera.projection = CAMERA_PERSPECTIVE;
 
-    State.classicModel = LoadModel("assets/player_wide.gltf");
-    State.slimModel = LoadModel("assets/player_slim.gltf");
 
-    Vector3 position = { 0.0f, 0.0f, 0.0f };
-    Shader alphaShader = LoadShader(0, TextFormat("assets/discard.fs"));
+    // unpack models to memory, raylib doesnt support loading models from a string in case of .gltf files
+    std::string playerClassicPath = GetSystemTempPath() + "player_classic.gltf";
+    std::string playerSlimPath = GetSystemTempPath() + "player_slim.gltf";
 
+    TraceLog(LOG_INFO, "Unpacking classic model...");
+    SaveFileText(playerClassicPath.c_str(), playerClassic.c_str());
+
+    TraceLog(LOG_INFO, "Unpacking slim model...");
+    SaveFileText(playerSlimPath.c_str(), playerSlim.c_str());
+
+    State.classicModel = LoadModel(playerClassicPath.c_str());
+    State.slimModel = LoadModel(playerSlimPath.c_str());
+
+    Shader alphaShader = LoadShaderFromMemory(nullptr, outerShader.c_str());
     State.classicModel.materials[1].shader = alphaShader;
     State.slimModel.materials[1].shader = alphaShader;
 
-    Image steveSkin = LoadImage("assets/steve.png");
-    Image alexSkin = LoadImage("assets/alex.png");
+    std::string steveTextureData = base64::from_base64(steveTexture);
+    std::string alexTextureData = base64::from_base64(alexTexture);
+    Image steveSkin = LoadImageFromMemory(".png", (const unsigned char*)steveTextureData.data(), (int)steveTextureData.size());
+    Image alexSkin = LoadImageFromMemory(".png", (const unsigned char*)alexTextureData.data(), (int)alexTextureData.size());
+
     State.steve = MinecraftSkin::LoadSkinIntoStruct(steveSkin);
     State.alex = MinecraftSkin::LoadSkinIntoStruct(alexSkin);
+    SetMaterialTexture(&State.classicModel.materials[1], MATERIAL_MAP_DIFFUSE, State.steve.texture);
+    SetMaterialTexture(&State.slimModel.materials[1], MATERIAL_MAP_DIFFUSE, State.alex.texture);
+
     UnloadImage(steveSkin);
     UnloadImage(alexSkin);
 
