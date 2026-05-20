@@ -3,7 +3,16 @@
 #include <raylib.h>
 #include <string>
 
+enum SkinSource {
+    SkinSource_Unknown,
+    SkinSource_Minecraft,
+    SkinSource_File,
+    SkinSource_URL
+};
+
 struct Skin {
+    SkinSource source;
+    std::string path;
     bool isOldType;
     Texture2D texture;
     Texture2D original;

@@ -7,6 +7,7 @@
 #include <cstring>
 #include <raylib.h>
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "State.h"
 #include "rlimgui/rlImGui.h"
 #include "portable-file-dialogs.h"
@@ -158,13 +159,32 @@ void RunTextureWindow() {
 
 void RunCameraWindow() {
     if (showCameraWindow) {
-        ImGui::Begin("Camera properties", &showCameraWindow, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
+        ImGui::Begin("Camera and environment properties", &showCameraWindow, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
 
         ImGui::Text("Camera coordinates: ");
         ImGui::Text("%f %f %f", State.camera.position.x, State.camera.position.y, State.camera.position.z);
 
         ImGui::Text("Camera target: ");
         ImGui::Text("%f %f %f", State.camera.target.x, State.camera.target.y, State.camera.target.z);
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        if (ImGui::SliderFloat("FOV", &State.cameraFov, 45.0f, 90.0f, "%.0f°")) {
+            State.camera.fovy = State.cameraFov;
+        }
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::ColorPicker3("Viewport background color", State.backgroundColor, ImGuiColorEditFlags_DisplayHex | ImGuiColorEditFlags_DisplayRGB);
+        if (ImGui::Button("Reset color to default")) {
+            State.backgroundColor[0] = 0.2f;
+            State.backgroundColor[1] = 0.2f;
+            State.backgroundColor[2] = 0.2f;
+        }
 
         ImGui::End();
     }
@@ -220,38 +240,74 @@ void UserInterface::RunUI() {
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("View")) {
-            if (ImGui::MenuItem("Camera properties...")) showCameraWindow = true;
+            if (ImGui::MenuItem("Camera and environment properties...")) showCameraWindow = true;
             if (ImGui::MenuItem("Model properties...")) showMeshWindow = true;
             ImGui::Separator();
             if (ImGui::MenuItem("View currently loaded skin...")) showTextureWindow = true;
             ImGui::EndMenu();
         }
+        if (ImGui::MenuItem("Reload")) {
+            switch (State.loadedSkin.source) {
+                case SkinSource_File:
+                    if (!MinecraftSkin::LoadSkinFromPNG(std::string(State.loadedSkin.path))) {
+                        ShowInvalidTexturePopup();
+                    }
+                    break;
+                case SkinSource_Minecraft:
+                    MinecraftSkin::LoadSkinFromMinecraft(std::string(State.loadedSkin.path));
+                    break;
+                case SkinSource_URL:
+                    MinecraftSkin::LoadSkinFromURL(std::string(State.loadedSkin.path));
+                    break;
+            }
+        }
         if (ImGui::MenuItem("About...")) aboutPopup = true;
-
-        std::string statusText = "Model: ";
-        statusText += State.isSlim ? "Slim" : "Classic";
-        statusText += ", Skin type: ";
-        statusText += State.loadedSkin.isOldType ? "Pre-1.8" : "1.8+";
-
-        float padding = 20.0f;
-        float statusPosX;
-        if (IsCursorHidden()) {
-           statusPosX = ImGui::GetWindowWidth() - ImGui::CalcTextSize(statusText.c_str()).x - ImGui::CalcTextSize(" -- CURSOR LOCKED (ESC to unlock) --").x - padding;
-        } else {
-            statusPosX = ImGui::GetWindowWidth() - ImGui::CalcTextSize(statusText.c_str()).x - padding;
-        }
-
-        ImGui::SameLine(statusPosX);
-        ImGui::TextDisabled("%s", statusText.c_str());
-
-        if (IsCursorHidden()) {
-            float cursorLockedPosX = ImGui::GetWindowWidth() - ImGui::CalcTextSize(" -- CURSOR LOCKED (ESC to unlock) --").x - padding;
-            ImGui::SameLine(cursorLockedPosX);
-            ImGui::TextColored(ImVec4(1, 0, 0, 1), " -- CURSOR LOCKED (ESC to unlock) --");
-        }
 
         ImGui::EndMainMenuBar();
     }
+
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.0f, 4.0f));
+
+    if (ImGui::BeginViewportSideBar("##MainStatusBar", ImGui::GetMainViewport(), ImGuiDir_Down, ImGui::GetFrameHeight(), ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings)) {
+        ImGui::Text("FPS: %d", GetFPS());
+
+        ImGui::SameLine();
+        ImGui::Text("|");
+        ImGui::SameLine();
+
+        ImGui::Text("Model Type: %s", State.isSlim ? "Slim (Alex)" : "Classic (Steve)");
+
+        ImGui::SameLine();
+        ImGui::Text("|");
+        ImGui::SameLine();
+
+        ImGui::Text("Skin type: %s", State.loadedSkin.isOldType ? "Pre-1.8" : "1.8+");
+
+        ImGui::SameLine();
+        ImGui::Text("|");
+        ImGui::SameLine();
+
+        ImGui::Text("Skin source: %s", State.loadedSkin.source == SkinSource_Minecraft ? "Minecraft"
+            : State.loadedSkin.source == SkinSource_File ? "Local file"
+            : State.loadedSkin.source == SkinSource_URL ? "URL" : "Default");
+
+        ImGui::SameLine();
+        ImGui::Text("(%s)", GetFileName(State.loadedSkin.path.c_str()));
+
+        if (IsCursorHidden()) {
+            ImGui::SameLine();
+            ImGui::Text("|");
+            ImGui::SameLine();
+
+            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "-- CURSOR LOCKED (ESC to unlock) --");
+        }
+
+        ImGui::End();
+    }
+
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor();
 
     RunMinecraftSkinPopup();
     RunURLSkinPopup();

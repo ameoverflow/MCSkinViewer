@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
 
         BeginDrawing();
 
-        ClearBackground({50, 50, 50, 255});
+        ClearBackground({State.backgroundColor[0] * 255.0f, State.backgroundColor[1] * 255.0f, State.backgroundColor[2] * 255.0f, 255});
         BeginMode3D(State.camera);
         //DrawModel(State.isSlim ? State.slimModel : State.classicModel, position, 1.0f, WHITE);
 

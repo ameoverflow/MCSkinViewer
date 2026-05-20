@@ -66,6 +66,8 @@ bool MinecraftSkin::LoadSkinFromPNG(const std::string& filePath) {
     }
 
     Skin skin = LoadSkinIntoStruct(img);
+    skin.source = SkinSource_File;
+    skin.path = filePath;
 
     if (skin.texture.id == 0) return false;
 
@@ -174,6 +176,8 @@ bool MinecraftSkin::LoadSkinFromMinecraft(const std::string& username) {
     bool loadResult = LoadSkinFromURL(skinObject["url"].get<std::string>());
     if (!loadResult) return false;
     SetWindowTitle(std::string("Skin viewer | " + username).c_str());
+    State.loadedSkin.source = SkinSource_Minecraft;
+    State.loadedSkin.path = username;
 
     return true;
 }
@@ -218,6 +222,8 @@ bool MinecraftSkin::LoadSkinFromURL(const std::string& url) {
         }
 
         Skin skin = LoadSkinIntoStruct(skinImage);
+        skin.source = SkinSource_URL;
+        skin.path = url;
 
         if (skin.texture.id == 0) return false;
         UnloadTexture(State.loadedSkin.texture);
@@ -230,6 +236,7 @@ bool MinecraftSkin::LoadSkinFromURL(const std::string& url) {
         } else {
             State.isSlim = IsSlimSkin(skinImage);
         }
+        State.loadedSkin = skin;
 
         UnloadImage(skinImage);
         return true;
