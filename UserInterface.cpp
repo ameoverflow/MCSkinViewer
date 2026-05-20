@@ -276,7 +276,7 @@ void UserInterface::RunUI() {
         ImGui::Text("|");
         ImGui::SameLine();
 
-        ImGui::Text("Model Type: %s", State.isSlim ? "Slim (Alex)" : "Classic (Steve)");
+        ImGui::Text("Model type: %s", State.isSlim ? "Slim (3px)" : "Classic (4px)");
 
         ImGui::SameLine();
         ImGui::Text("|");
