@@ -2,6 +2,7 @@
 
 #include "Assets.h"
 #include "base64.hpp"
+#include "FileSystem.h"
 #include "raylib.h"
 #include "raymath.h"
 #include "imgui/imgui.h"
@@ -12,19 +13,9 @@
 
 Vector3 position = { 0.0f, 0.0f, 0.0f };
 
-std::string GetSystemTempPath() {
-#ifdef _WIN32
-    char tempFolder[MAX_PATH];
-    GetTempPathA(MAX_PATH, tempFolder);
-    return std::string(tempFolder);
-    #else
-    return "/tmp/";
-#endif
-}
-
 int main(int argc, char* argv[])
 {
-    InitWindow(1280, 720, "Skin viewer | Default skin");
+    InitWindow(1600, 900, "Skin viewer | Default skin");
     SetWindowState(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
     SetExitKey(0);
 
@@ -39,8 +30,8 @@ int main(int argc, char* argv[])
 
 
     // unpack models to memory, raylib doesnt support loading models from a string in case of .gltf files
-    std::string playerClassicPath = GetSystemTempPath() + "player_classic.gltf";
-    std::string playerSlimPath = GetSystemTempPath() + "player_slim.gltf";
+    std::string playerClassicPath = FileSystem::GetSystemTempPath() + "player_classic.gltf";
+    std::string playerSlimPath = FileSystem::GetSystemTempPath() + "player_slim.gltf";
 
     TraceLog(LOG_INFO, "Unpacking classic model...");
     SaveFileText(playerClassicPath.c_str(), playerClassic.c_str());
@@ -60,10 +51,10 @@ int main(int argc, char* argv[])
     Image steveSkin = LoadImageFromMemory(".png", (const unsigned char*)steveTextureData.data(), (int)steveTextureData.size());
     Image alexSkin = LoadImageFromMemory(".png", (const unsigned char*)alexTextureData.data(), (int)alexTextureData.size());
 
-    State.steve = MinecraftSkin::LoadSkinIntoStruct(steveSkin);
-    State.alex = MinecraftSkin::LoadSkinIntoStruct(alexSkin);
-    SetMaterialTexture(&State.classicModel.materials[1], MATERIAL_MAP_DIFFUSE, State.steve.texture);
-    SetMaterialTexture(&State.slimModel.materials[1], MATERIAL_MAP_DIFFUSE, State.alex.texture);
+    State.steveSkin = MinecraftSkin::LoadSkinIntoStruct(steveSkin);
+    State.alexSkin = MinecraftSkin::LoadSkinIntoStruct(alexSkin);
+    SetMaterialTexture(&State.classicModel.materials[1], MATERIAL_MAP_DIFFUSE, State.steveSkin.texture);
+    SetMaterialTexture(&State.slimModel.materials[1], MATERIAL_MAP_DIFFUSE, State.alexSkin.texture);
 
     UnloadImage(steveSkin);
     UnloadImage(alexSkin);
@@ -80,6 +71,27 @@ int main(int argc, char* argv[])
 
     while (!WindowShouldClose() && !State.quit)
     {
+        if (State.hotReloadEnabled && State.needsReload && State.reloadCooldownTimer <= 0.0f) {
+            TraceLog(LOG_INFO, "Skin file modified on disk! Need reload");
+
+            switch (State.loadedSkin.source) {
+                case SkinSource_File:
+                    MinecraftSkin::LoadSkinFromPNG(std::string(State.loadedSkin.path));
+                    break;
+                case SkinSource_Minecraft:
+                    MinecraftSkin::LoadSkinFromMinecraft(State.loadedSkin.path);
+                    break;
+                case SkinSource_URL:
+                    MinecraftSkin::LoadSkinFromURL(State.loadedSkin.path);
+                    break;
+            }
+
+            State.needsReload = false;
+            State.reloadCooldownTimer = 0.1f;
+        }
+
+        if (State.reloadCooldownTimer > 0.0f) State.reloadCooldownTimer -= GetFrameTime();
+
         if (IsFileDropped()) {
             FilePathList list = LoadDroppedFiles();
             if (IsFileExtension(list.paths[0], "png")) {
@@ -113,6 +125,15 @@ int main(int argc, char* argv[])
         //DrawModel(State.isSlim ? State.slimModel : State.classicModel, position, 1.0f, WHITE);
 
         Matrix transform = MatrixScale(1, 1, 1);
+        std::string tmpUsername = State.loadedSkin.path;
+        std::transform(tmpUsername.begin(), tmpUsername.end(), tmpUsername.begin(), ::tolower);
+        if (State.loadedSkin.source == SkinSource_Minecraft && tmpUsername == "dinnerbone") {
+            BoundingBox box = GetModelBoundingBox(State.isSlim ? State.slimModel : State.classicModel);
+            float height = box.max.y - box.min.y;
+            transform = MatrixRotateX(PI);
+            transform = MatrixRotateZ(PI);
+            position.y = height;
+        }
         transform = MatrixMultiply(transform, MatrixTranslate(position.x, position.y, position.z));
         for (int i = 0; i < 12; i++) {
             if (!State.enabledMeshes[i]) continue;
@@ -133,8 +154,8 @@ int main(int argc, char* argv[])
     }
     UnloadModel(State.classicModel);
     UnloadModel(State.slimModel);
-    UnloadTexture(State.steve.texture);
-    UnloadTexture(State.alex.texture);
+    UnloadTexture(State.steveSkin.texture);
+    UnloadTexture(State.alexSkin.texture);
     UnloadTexture(State.loadedSkin.texture);
     rlImGuiShutdown();
     CloseWindow();

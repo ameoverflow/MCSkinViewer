@@ -3,6 +3,7 @@
 #include "httplib.h"
 #include "json.hpp"
 #include "base64.hpp"
+#include "FileSystem.h"
 #include "State.h"
 #include "UserInterface.h"
 
@@ -56,18 +57,15 @@ Skin MinecraftSkin::LoadSkinIntoStruct(Image img) {
     return skin;
 }
 
-bool MinecraftSkin::LoadSkinFromPNG(const std::string& filePath) {
+bool MinecraftSkin::LoadSkinFromPNG(const std::string filePath) {
     Image img = LoadImage(filePath.c_str());
 
     if (img.width != 64 || (img.height != 64 && img.height != 32)) {
-        UserInterface::ShowInvalidTexturePopup();
         UnloadImage(img);
         return false;
     }
 
     Skin skin = LoadSkinIntoStruct(img);
-    skin.source = SkinSource_File;
-    skin.path = filePath;
 
     if (skin.texture.id == 0) return false;
 
@@ -76,6 +74,12 @@ bool MinecraftSkin::LoadSkinFromPNG(const std::string& filePath) {
     SetWindowTitle(std::string("Skin viewer | " + std::string(GetFileName(filePath.c_str()))).c_str());
     SetMaterialTexture(&State.classicModel.materials[1], MATERIAL_MAP_DIFFUSE, skin.texture);
     SetMaterialTexture(&State.slimModel.materials[1], MATERIAL_MAP_DIFFUSE, skin.texture);
+
+    skin.source = SkinSource_File;
+    if (filePath != State.loadedSkin.path) {
+        FileSystem::ChangeWatchedFile(filePath);
+    }
+    skin.path = filePath;
 
     State.loadedSkin = skin;
     if (skin.isOldType) {
@@ -120,7 +124,7 @@ Texture2D MinecraftSkin::ConvertImage(Image img) {
     return LoadTextureFromImage(converted);
 }
 
-bool MinecraftSkin::LoadSkinFromMinecraft(const std::string& username) {
+bool MinecraftSkin::LoadSkinFromMinecraft(const std::string username) {
     httplib::Client minecraftApi("https://api.minecraftservices.com");
 
     nlohmann::json buffer;
@@ -182,7 +186,7 @@ bool MinecraftSkin::LoadSkinFromMinecraft(const std::string& username) {
     return true;
 }
 
-bool MinecraftSkin::LoadSkinFromURL(const std::string& url) {
+bool MinecraftSkin::LoadSkinFromURL(const std::string url) {
     std::string host, path;
 
     size_t protocolEnd = url.find("://");
@@ -237,7 +241,7 @@ bool MinecraftSkin::LoadSkinFromURL(const std::string& url) {
             State.isSlim = IsSlimSkin(skinImage);
         }
         State.loadedSkin = skin;
-
+        FileSystem::StopWatching();
         UnloadImage(skinImage);
         return true;
     }

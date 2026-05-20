@@ -7,6 +7,7 @@
 #include <raylib.h>
 
 #include "MinecraftSkin.h"
+#include "FileWatch.hpp"
 
 struct AppState {
     bool isSlim = false;
@@ -16,10 +17,15 @@ struct AppState {
     Skin loadedSkin;
     Camera camera;
     Model classicModel, slimModel;
-    Skin steve, alex;
+    Skin steveSkin, alexSkin;
     bool quit;
     float backgroundColor[3] = {0.1f, 0.1f, 0.1f};
     float cameraFov = 45.0f;
+
+    std::unique_ptr<filewatch::FileWatch<std::string>> watch = nullptr;
+    std::atomic<bool> needsReload = false;
+    bool hotReloadEnabled = true;
+    float reloadCooldownTimer = 0.0f;
 
     bool enabledMeshes[12] = {true, true, true, true, true, true, true, true, true, true, true, true};
 };

@@ -20,10 +20,10 @@ struct Skin {
 
 namespace MinecraftSkin {
     Skin LoadSkinIntoStruct(Image img);
-    bool LoadSkinFromPNG(const std::string& path);
+    bool LoadSkinFromPNG(const std::string path);
     Texture2D ConvertImage(Image img);
-    bool LoadSkinFromMinecraft(const std::string& username);
-    bool LoadSkinFromURL(const std::string& url);
+    bool LoadSkinFromMinecraft(const std::string username);
+    bool LoadSkinFromURL(const std::string url);
 }
 
 #endif //SKINVIEWER_MINECRAFTSKIN_H

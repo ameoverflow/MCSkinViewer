@@ -13,9 +13,11 @@ set(SOURCES
         MinecraftSkin.cpp
         UserInterface.cpp
         main.cpp
+        FileSystem.cpp
 )
 
 add_executable(SkinViewer ${SOURCES})
 
 target_include_directories(SkinViewer PRIVATE include imgui rlimgui/extras)
 target_link_libraries(SkinViewer PRIVATE ssl crypto raylib)
+target_compile_definitions(SkinViewer PRIVATE VERSION="0.1")

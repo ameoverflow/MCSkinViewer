@@ -14,7 +14,9 @@
 
 bool invalidFilePopup, invalidTexturePopup;
 bool aboutPopup, minecraftSkinPopup, urlPopup, pngPopup;
-bool showCameraWindow, showTextureWindow, showMeshWindow;
+bool showCameraWindow = true;
+bool showTextureWindow = true;
+bool showMeshWindow = true;
 
 void UserInterface::ShowInvalidFilePopup() {
     invalidFilePopup = true;
@@ -81,7 +83,7 @@ void RunFileBrowser() {
             auto f = pfd::open_file("Select a skin texture", pfd::path::home(),
                             { "PNG images (*.png)", "*.png" });
 
-            if (f.result().size() > 0) {
+            if (!f.result().empty()) {
                 std::memset(State.skinPath, 0, sizeof(State.skinPath));
                 std::strncpy(State.skinPath, f.result()[0].c_str(), sizeof(State.skinPath) - 1);
                 State.skinPath[sizeof(State.skinPath) - 1] = '\0';
@@ -110,7 +112,11 @@ void RunAboutPopup() {
     }
 
     if (ImGui::BeginPopupModal("About", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("(c) 2026 ameOverflow, licensed under MIT License.\nNot an official Minecraft project, not associated with Mojang or Microsoft.");
+        std::string aboutText = "Version " + std::string(VERSION);
+        aboutText += "\n(c) 2026 ameOverflow, licensed under GNU GPL v3 License.\n";;
+        aboutText += "Built on " + std::string(__DATE__) + " " + std::string(__TIME__);
+        aboutText += "\nNot an official Minecraft project, not associated with Mojang or Microsoft.";
+        ImGui::Text(aboutText.c_str());
         if (ImGui::Button("OK", ImVec2(64, 0))) {
             ImGui::CloseCurrentPopup();
         }
@@ -121,6 +127,9 @@ void RunAboutPopup() {
 
 void RunTextureWindow() {
     if (showTextureWindow) {
+        ImGui::SetNextWindowPos(ImVec2(20,551), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
+
         ImGui::Begin("Currently loaded skin", &showTextureWindow);
 
         ImVec2 availableSpace = ImGui::GetContentRegionAvail();
@@ -128,7 +137,7 @@ void RunTextureWindow() {
         Texture2D displaySkin;
 
         if (State.loadedSkin.original.id == 0) {
-            displaySkin = State.isSlim ? State.alex.original : State.steve.original;
+            displaySkin = State.isSlim ? State.alexSkin.original : State.steveSkin.original;
         } else {
             displaySkin = State.loadedSkin.original;
         }
@@ -159,6 +168,8 @@ void RunTextureWindow() {
 
 void RunCameraWindow() {
     if (showCameraWindow) {
+        ImGui::SetNextWindowPos(ImVec2(1295, 428), ImGuiCond_FirstUseEver);
+
         ImGui::Begin("Camera and environment properties", &showCameraWindow, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
 
         ImGui::Text("Camera coordinates: ");
@@ -171,7 +182,7 @@ void RunCameraWindow() {
         ImGui::Separator();
         ImGui::Spacing();
 
-        if (ImGui::SliderFloat("FOV", &State.cameraFov, 45.0f, 90.0f, "%.0f°")) {
+        if (ImGui::SliderFloat("FOV", &State.cameraFov, 30.0f, 90.0f, "%.0f°")) {
             State.camera.fovy = State.cameraFov;
         }
 
@@ -179,7 +190,8 @@ void RunCameraWindow() {
         ImGui::Separator();
         ImGui::Spacing();
 
-        ImGui::ColorPicker3("Viewport background color", State.backgroundColor, ImGuiColorEditFlags_DisplayHex | ImGuiColorEditFlags_DisplayRGB);
+        ImGui::Text("Viewport background color:");
+        ImGui::ColorPicker3("", State.backgroundColor, ImGuiColorEditFlags_DisplayHex | ImGuiColorEditFlags_DisplayRGB);
         if (ImGui::Button("Reset color to default")) {
             State.backgroundColor[0] = 0.1f;
             State.backgroundColor[1] = 0.1f;
@@ -192,9 +204,12 @@ void RunCameraWindow() {
 
 void RunModelPropertiesWindow() {
     if (showMeshWindow) {
-        ImGui::Begin("Model properties", &showMeshWindow, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
+        ImGui::SetNextWindowPos(ImVec2(20, 45), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(234, 360), ImGuiCond_FirstUseEver);
 
-        ImGui::Checkbox("Use slim (3px arms) model", &State.isSlim);
+        ImGui::Begin("Model properties", &showMeshWindow, ImGuiWindowFlags_NoResize);
+
+        ImGui::Checkbox("Use slim model", &State.isSlim);
 
         ImGui::Spacing();
         ImGui::Separator();
@@ -231,36 +246,23 @@ void UserInterface::RunUI() {
 
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("Open from PNG...")) pngPopup = true;
-            if (ImGui::MenuItem("Open from URL...")) urlPopup = true;
-            if (ImGui::MenuItem("Open from Minecraft...")) minecraftSkinPopup = true;
+            if (ImGui::MenuItem("Open from PNG...", "Ctrl+O")) pngPopup = true;
+            if (ImGui::MenuItem("Open from URL...", "Ctrl+U")) urlPopup = true;
+            if (ImGui::MenuItem("Open from Minecraft...", "Ctrl+M")) minecraftSkinPopup = true;
+            ImGui::Separator();
+            ImGui::Checkbox("Hot reload", &State.hotReloadEnabled);
             ImGui::Separator();
             if (ImGui::MenuItem("Exit", "Alt+F4")) State.quit = true;
 
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("View")) {
-            if (ImGui::MenuItem("Camera and environment properties...")) showCameraWindow = true;
-            if (ImGui::MenuItem("Model properties...")) showMeshWindow = true;
-            ImGui::Separator();
-            if (ImGui::MenuItem("View currently loaded skin...")) showTextureWindow = true;
+            if (ImGui::MenuItem("Camera and environment properties...", "Ctrl+1")) showCameraWindow = true;
+            if (ImGui::MenuItem("Model properties...", "Ctrl+2")) showMeshWindow = true;
+            if (ImGui::MenuItem("View currently loaded skin...", "Ctrl+3")) showTextureWindow = true;
             ImGui::EndMenu();
         }
-        if (ImGui::MenuItem("Reload")) {
-            switch (State.loadedSkin.source) {
-                case SkinSource_File:
-                    if (!MinecraftSkin::LoadSkinFromPNG(std::string(State.loadedSkin.path))) {
-                        ShowInvalidTexturePopup();
-                    }
-                    break;
-                case SkinSource_Minecraft:
-                    MinecraftSkin::LoadSkinFromMinecraft(std::string(State.loadedSkin.path));
-                    break;
-                case SkinSource_URL:
-                    MinecraftSkin::LoadSkinFromURL(std::string(State.loadedSkin.path));
-                    break;
-            }
-        }
+        if (ImGui::MenuItem("Reload (Ctrl+R)")) State.needsReload = true;
         if (ImGui::MenuItem("About...")) aboutPopup = true;
 
         ImGui::EndMainMenuBar();
@@ -276,7 +278,13 @@ void UserInterface::RunUI() {
         ImGui::Text("|");
         ImGui::SameLine();
 
-        ImGui::Text("Model type: %s", State.isSlim ? "Slim (3px)" : "Classic (4px)");
+        ImGui::Text("Window size: %i, %i", GetRenderWidth(), GetRenderHeight());
+
+        ImGui::SameLine();
+        ImGui::Text("|");
+        ImGui::SameLine();
+
+        ImGui::Text("Model type: %s", State.isSlim ? "Slim" : "Classic");
 
         ImGui::SameLine();
         ImGui::Text("|");
@@ -308,6 +316,31 @@ void UserInterface::RunUI() {
 
     ImGui::PopStyleVar();
     ImGui::PopStyleColor();
+
+    // check some hotkeys
+    if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) {
+        if (IsKeyPressed(KEY_O)) {
+            auto f = pfd::open_file("Select a skin texture", pfd::path::home(),
+                            { "PNG images (*.png)", "*.png" });
+
+            if (!f.result().empty()) {
+                std::memset(State.skinPath, 0, sizeof(State.skinPath));
+                std::strncpy(State.skinPath, f.result()[0].c_str(), sizeof(State.skinPath) - 1);
+                State.skinPath[sizeof(State.skinPath) - 1] = '\0';
+                if (!MinecraftSkin::LoadSkinFromPNG(std::string(State.skinPath))) {
+                    ShowInvalidTexturePopup();
+                }
+            }
+        }
+
+        if (IsKeyPressed(KEY_M)) minecraftSkinPopup = true;
+        if (IsKeyPressed(KEY_U)) urlPopup = true;
+        if (IsKeyPressed(KEY_R)) State.needsReload = true;
+
+        if (IsKeyPressed(KEY_ONE)) showCameraWindow = !showCameraWindow;
+        if (IsKeyPressed(KEY_TWO)) showMeshWindow = !showMeshWindow;
+        if (IsKeyPressed(KEY_THREE)) showTextureWindow = !showTextureWindow;
+    }
 
     RunMinecraftSkinPopup();
     RunURLSkinPopup();
