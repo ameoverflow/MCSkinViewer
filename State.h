@@ -18,6 +18,8 @@ struct AppState {
     Model classicModel, slimModel;
     Skin steve, alex;
     bool quit;
+
+    bool enabledMeshes[12] = {true, true, true, true, true, true, true, true, true, true, true, true};
 };
 
 inline AppState State;

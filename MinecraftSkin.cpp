@@ -6,6 +6,34 @@
 #include "State.h"
 #include "UserInterface.h"
 
+bool IsSlimSkin(Image skin) {
+    int x, y;
+    x = 54;
+    for (y = 20; y <= 31; y++) {
+        Color pixel = GetImageColor(skin, x, y);
+        if (pixel.a == 0) return true;
+    }
+    x = 55;
+    for (y = 20; y <= 31; y++) {
+        Color pixel = GetImageColor(skin, x, y);
+        if (pixel.a == 0) return true;
+    }
+
+    if (skin.height == 64) {
+        x = 46;
+        for (y = 52; y <= 63; y++) {
+            Color pixel = GetImageColor(skin, x, y);
+            if (pixel.a == 0) return true;
+        }
+        x = 47;
+        for (y = 52; y <= 63; y++) {
+            Color pixel = GetImageColor(skin, x, y);
+            if (pixel.a == 0) return true;
+        }
+    }
+    return false;
+}
+
 Skin MinecraftSkin::LoadSkinIntoStruct(Image img) {
     Skin skin;
 
@@ -38,7 +66,6 @@ bool MinecraftSkin::LoadSkinFromPNG(const std::string& filePath) {
     }
 
     Skin skin = LoadSkinIntoStruct(img);
-    UnloadImage(img);
 
     if (skin.texture.id == 0) return false;
 
@@ -47,7 +74,15 @@ bool MinecraftSkin::LoadSkinFromPNG(const std::string& filePath) {
     SetWindowTitle(std::string("Skin viewer | " + std::string(GetFileName(filePath.c_str()))).c_str());
     SetMaterialTexture(&State.classicModel.materials[1], MATERIAL_MAP_DIFFUSE, skin.texture);
     SetMaterialTexture(&State.slimModel.materials[1], MATERIAL_MAP_DIFFUSE, skin.texture);
+
     State.loadedSkin = skin;
+    if (skin.isOldType) {
+        State.isSlim = false;
+    } else {
+        State.isSlim = IsSlimSkin(img);
+    }
+
+    UnloadImage(img);
 
     return true;
 }
@@ -183,7 +218,6 @@ bool MinecraftSkin::LoadSkinFromURL(const std::string& url) {
         }
 
         Skin skin = LoadSkinIntoStruct(skinImage);
-        UnloadImage(skinImage);
 
         if (skin.texture.id == 0) return false;
         UnloadTexture(State.loadedSkin.texture);
@@ -191,7 +225,13 @@ bool MinecraftSkin::LoadSkinFromURL(const std::string& url) {
         SetWindowTitle(std::string("Skin viewer | " + url).c_str());
         SetMaterialTexture(&State.classicModel.materials[1], MATERIAL_MAP_DIFFUSE, skin.texture);
         SetMaterialTexture(&State.slimModel.materials[1], MATERIAL_MAP_DIFFUSE, skin.texture);
-        State.loadedSkin = skin;
+        if (skin.isOldType) {
+            State.isSlim = false;
+        } else {
+            State.isSlim = IsSlimSkin(skinImage);
+        }
+
+        UnloadImage(skinImage);
         return true;
     }
 

@@ -13,7 +13,7 @@
 
 bool invalidFilePopup, invalidTexturePopup;
 bool aboutPopup, minecraftSkinPopup, urlPopup, pngPopup;
-bool showCameraWindow, showTextureWindow;
+bool showCameraWindow, showTextureWindow, showMeshWindow;
 
 void UserInterface::ShowInvalidFilePopup() {
     invalidFilePopup = true;
@@ -170,6 +170,34 @@ void RunCameraWindow() {
     }
 }
 
+void RunModelPropertiesWindow() {
+    if (showMeshWindow) {
+        ImGui::Begin("Model properties", &showMeshWindow, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
+
+        ImGui::Checkbox("Use slim (3px arms) model", &State.isSlim);
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::Text("Toggle body parts: ");
+        ImGui::Checkbox("Head", &State.enabledMeshes[0]);
+        ImGui::Checkbox("Body", &State.enabledMeshes[2]);
+        ImGui::Checkbox("Left arm", &State.enabledMeshes[6]);
+        ImGui::Checkbox("Right arm", &State.enabledMeshes[4]);
+        ImGui::Checkbox("Left leg", &State.enabledMeshes[10]);
+        ImGui::Checkbox("Right leg", &State.enabledMeshes[8]);
+        ImGui::Checkbox("Hat", &State.enabledMeshes[1]);
+        ImGui::Checkbox("Outer body", &State.enabledMeshes[3]);
+        ImGui::Checkbox("Outer left arm", &State.enabledMeshes[7]);
+        ImGui::Checkbox("Outer right arm", &State.enabledMeshes[5]);
+        ImGui::Checkbox("Outer left leg", &State.enabledMeshes[11]);
+        ImGui::Checkbox("Outer right leg", &State.enabledMeshes[9]);
+
+        ImGui::End();
+    }
+}
+
 void UserInterface::RunUI() {
     if (invalidFilePopup) {
         ImGui::OpenPopup("Invalid file");
@@ -193,10 +221,9 @@ void UserInterface::RunUI() {
         }
         if (ImGui::BeginMenu("View")) {
             if (ImGui::MenuItem("Camera properties...")) showCameraWindow = true;
-            if (ImGui::MenuItem("View currently loaded skin...")) showTextureWindow = true;
+            if (ImGui::MenuItem("Model properties...")) showMeshWindow = true;
             ImGui::Separator();
-            if (ImGui::MenuItem("Classic skin type (4px arms)")) State.isSlim = false;
-            if (ImGui::MenuItem("Slim skin type (3px arms)")) State.isSlim = true;
+            if (ImGui::MenuItem("View currently loaded skin...")) showTextureWindow = true;
             ImGui::EndMenu();
         }
         if (ImGui::MenuItem("About...")) aboutPopup = true;
@@ -232,6 +259,7 @@ void UserInterface::RunUI() {
     RunCameraWindow();
     RunTextureWindow();
     RunFileBrowser();
+    RunModelPropertiesWindow();
 
     if (ImGui::BeginPopupModal("Invalid file", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text("Provided file is invalid. It needs to be a .png file.");

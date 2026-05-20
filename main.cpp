@@ -1,5 +1,5 @@
-#include <iostream>
 #include "raylib.h"
+#include "raymath.h"
 #include "imgui/imgui.h"
 #include "rlimgui/rlImGui.h"
 #include "MinecraftSkin.h"
@@ -36,9 +36,6 @@ int main(int argc, char* argv[])
     State.alex = MinecraftSkin::LoadSkinIntoStruct(alexSkin);
     UnloadImage(steveSkin);
     UnloadImage(alexSkin);
-
-    SetMaterialTexture(&State.classicModel.materials[1], MATERIAL_MAP_DIFFUSE, State.steve.texture);
-    SetMaterialTexture(&State.slimModel.materials[1], MATERIAL_MAP_DIFFUSE, State.alex.texture);
 
     if (argc > 1) {
         if (IsFileExtension(argv[1], "png")) {
@@ -82,7 +79,16 @@ int main(int argc, char* argv[])
 
         ClearBackground({50, 50, 50, 255});
         BeginMode3D(State.camera);
-        DrawModel(State.isSlim ? State.slimModel : State.classicModel, position, 1.0f, WHITE);
+        //DrawModel(State.isSlim ? State.slimModel : State.classicModel, position, 1.0f, WHITE);
+
+        Matrix transform = MatrixScale(1, 1, 1);
+        transform = MatrixMultiply(transform, MatrixTranslate(position.x, position.y, position.z));
+        for (int i = 0; i < 12; i++) {
+            if (!State.enabledMeshes[i]) continue;
+            int matIndex = (State.isSlim ? State.slimModel : State.classicModel).meshMaterial[i];
+            DrawMesh( (State.isSlim ? State.slimModel : State.classicModel).meshes[i],  (State.isSlim ? State.slimModel : State.classicModel).materials[matIndex], transform);
+        }
+
         DrawGrid(10, 1.0f);
         EndMode3D();
 
