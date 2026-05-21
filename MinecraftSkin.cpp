@@ -72,8 +72,6 @@ bool MinecraftSkin::LoadSkinFromPNG(const std::string filePath) {
     UnloadTexture(State.loadedSkin.texture);
 
     SetWindowTitle(std::string("Skin viewer | " + std::string(GetFileName(filePath.c_str()))).c_str());
-    SetMaterialTexture(&State.classicModel.materials[1], MATERIAL_MAP_DIFFUSE, skin.texture);
-    SetMaterialTexture(&State.slimModel.materials[1], MATERIAL_MAP_DIFFUSE, skin.texture);
 
     skin.source = SkinSource_File;
     if (filePath != State.loadedSkin.path) {
@@ -233,8 +231,6 @@ bool MinecraftSkin::LoadSkinFromURL(const std::string url) {
         UnloadTexture(State.loadedSkin.texture);
 
         SetWindowTitle(std::string("Skin viewer | " + url).c_str());
-        SetMaterialTexture(&State.classicModel.materials[1], MATERIAL_MAP_DIFFUSE, skin.texture);
-        SetMaterialTexture(&State.slimModel.materials[1], MATERIAL_MAP_DIFFUSE, skin.texture);
         if (skin.isOldType) {
             State.isSlim = false;
         } else {

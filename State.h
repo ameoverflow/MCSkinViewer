@@ -21,7 +21,8 @@ struct AppState {
     bool quit;
     float backgroundColor[3] = {0.1f, 0.1f, 0.1f};
     float cameraFov = 45.0f;
-
+    bool enableSkinGrid;
+    bool enableGrid = true;
     std::unique_ptr<filewatch::FileWatch<std::string>> watch = nullptr;
     std::atomic<bool> needsReload = false;
     bool hotReloadEnabled = true;

@@ -13,10 +13,13 @@
 #include "portable-file-dialogs.h"
 
 bool invalidFilePopup, invalidTexturePopup;
-bool aboutPopup, minecraftSkinPopup, urlPopup, pngPopup;
+bool aboutPopup, minecraftSkinPopup, urlPopup, pngPopup, saveFilePopup;
 bool showCameraWindow = true;
 bool showTextureWindow = true;
 bool showMeshWindow = true;
+char saveFilePath[256] = "";
+bool openFileOnSave;
+std::string savePathString;
 
 void UserInterface::ShowInvalidFilePopup() {
     invalidFilePopup = true;
@@ -93,6 +96,47 @@ void RunFileBrowser() {
         if (ImGui::Button("Open", ImVec2(64, 0)) || inputSubmitted) {
             if (!MinecraftSkin::LoadSkinFromPNG(std::string(State.skinPath))) {
                 UserInterface::ShowInvalidTexturePopup();
+            }
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(64, 0))) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+}
+
+void RunSavePopup() {
+    if (saveFilePopup) {
+        std::memset(saveFilePath, 0, sizeof(saveFilePath));
+        ImGui::OpenPopup("Save skin");
+        saveFilePopup = false;
+    }
+
+    if (ImGui::BeginPopupModal("Save skin", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        bool inputSubmitted = ImGui::InputText(" Path", saveFilePath, sizeof(saveFilePath), ImGuiInputTextFlags_EnterReturnsTrue);
+        ImGui::SameLine();
+        if (pfd::settings::available() && ImGui::Button("...", ImVec2(32, 0))) {
+            auto f = pfd::save_file("Select save location", pfd::path::home(),
+                            { "PNG images (*.png)", "*.png" });
+
+            if (!f.result().empty()) {
+                std::strncpy(saveFilePath, f.result().c_str(), sizeof(saveFilePath) - 1);
+                saveFilePath[sizeof(saveFilePath) - 1] = '\0';
+            }
+        }
+
+        ImGui::Checkbox("Open file when saved", &openFileOnSave);
+
+        if (ImGui::Button("Save", ImVec2(64, 0)) || inputSubmitted) {
+            Image output = LoadImageFromTexture(State.loadedSkin.original);
+            ExportImage(output, saveFilePath);
+            if (openFileOnSave) {
+                if (!MinecraftSkin::LoadSkinFromPNG(std::string(saveFilePath))) {
+                    UserInterface::ShowInvalidTexturePopup();
+                }
             }
             ImGui::CloseCurrentPopup();
         }
@@ -190,6 +234,8 @@ void RunCameraWindow() {
         ImGui::Separator();
         ImGui::Spacing();
 
+        ImGui::Checkbox("Draw grid under model", &State.enableGrid);
+
         ImGui::Text("Viewport background color:");
         ImGui::ColorPicker3("", State.backgroundColor, ImGuiColorEditFlags_DisplayHex | ImGuiColorEditFlags_DisplayRGB);
         if (ImGui::Button("Reset color to default")) {
@@ -210,6 +256,7 @@ void RunModelPropertiesWindow() {
         ImGui::Begin("Model properties", &showMeshWindow, ImGuiWindowFlags_NoResize);
 
         ImGui::Checkbox("Use slim model", &State.isSlim);
+        ImGui::Checkbox("Enable grid", &State.enableSkinGrid);
 
         ImGui::Spacing();
         ImGui::Separator();
@@ -249,6 +296,8 @@ void UserInterface::RunUI() {
             if (ImGui::MenuItem("Open from PNG...", "Ctrl+O")) pngPopup = true;
             if (ImGui::MenuItem("Open from URL...", "Ctrl+U")) urlPopup = true;
             if (ImGui::MenuItem("Open from Minecraft...", "Ctrl+M")) minecraftSkinPopup = true;
+            ImGui::Separator();
+            if (ImGui::MenuItem("Save...", "Ctrl+S", false, State.loadedSkin.source != SkinSource_Unknown && State.loadedSkin.source != SkinSource_File)) saveFilePopup = true;
             ImGui::Separator();
             ImGui::Checkbox("Hot reload", &State.hotReloadEnabled);
             ImGui::Separator();
@@ -349,6 +398,7 @@ void UserInterface::RunUI() {
     RunTextureWindow();
     RunFileBrowser();
     RunModelPropertiesWindow();
+    RunSavePopup();
 
     if (ImGui::BeginPopupModal("Invalid file", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text("Provided file is invalid. It needs to be a .png file.");

@@ -28,8 +28,7 @@ void main()
     // Texel color fetching from texture map
     vec4 texelColor = texture(texture0, fragTexCoord)*colDiffuse*fragColor;
 
-    // CRITICAL: if the pixel is transparent, discard it completely!
-    if (texelColor.a < 0.1) discard;
+    if (texelColor.a == 0.0f) discard;
 
     finalColor = texelColor;
 }

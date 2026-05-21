@@ -1,5 +1,4 @@
 #include <filesystem>
-
 #include "Assets.h"
 #include "base64.hpp"
 #include "FileSystem.h"
@@ -12,6 +11,8 @@
 #include "UserInterface.h"
 
 Vector3 position = { 0.0f, 0.0f, 0.0f };
+RenderTexture skinRender;
+Color gridColor = {128, 128, 128, 128};
 
 int main(int argc, char* argv[])
 {
@@ -27,7 +28,6 @@ int main(int argc, char* argv[])
     State.camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };
     State.camera.fovy = 45.0f;
     State.camera.projection = CAMERA_PERSPECTIVE;
-
 
     // unpack models to memory, raylib doesnt support loading models from a string in case of .gltf files
     std::string playerClassicPath = FileSystem::GetSystemTempPath() + "player_classic.gltf";
@@ -51,10 +51,12 @@ int main(int argc, char* argv[])
     Image steveSkin = LoadImageFromMemory(".png", (const unsigned char*)steveTextureData.data(), (int)steveTextureData.size());
     Image alexSkin = LoadImageFromMemory(".png", (const unsigned char*)alexTextureData.data(), (int)alexTextureData.size());
 
+    skinRender = LoadRenderTexture(640, 640);
+
     State.steveSkin = MinecraftSkin::LoadSkinIntoStruct(steveSkin);
     State.alexSkin = MinecraftSkin::LoadSkinIntoStruct(alexSkin);
-    SetMaterialTexture(&State.classicModel.materials[1], MATERIAL_MAP_DIFFUSE, State.steveSkin.texture);
-    SetMaterialTexture(&State.slimModel.materials[1], MATERIAL_MAP_DIFFUSE, State.alexSkin.texture);
+    SetMaterialTexture(&State.classicModel.materials[1], MATERIAL_MAP_DIFFUSE, skinRender.texture);
+    SetMaterialTexture(&State.slimModel.materials[1], MATERIAL_MAP_DIFFUSE, skinRender.texture);
 
     UnloadImage(steveSkin);
     UnloadImage(alexSkin);
@@ -118,12 +120,34 @@ int main(int argc, char* argv[])
             }
         }
 
-        BeginDrawing();
+        BeginTextureMode(skinRender);
+        ClearBackground(BLANK);
 
+        if (State.loadedSkin.texture.id == 0) {
+            DrawTexturePro(State.isSlim ? State.alexSkin.texture : State.steveSkin.texture, {0, 0, 64, -64}, {0, 0, 640, 640}, {0, 0}, 0, WHITE);
+        } else {
+            DrawTexturePro(State.loadedSkin.texture, {0, 0, 64, -64}, {0, 0, 640, 640}, {0, 0}, 0, WHITE);
+        }
+
+        if (State.enableSkinGrid) {
+            for (int x = 0; x <= 640; x += 10) {
+                DrawLine(x, 0, x, 640, gridColor);
+            }
+
+            for (int y = 0; y <= 640; y += 10) {
+                DrawLine(0, y, 640, y, gridColor);
+            }
+
+            DrawRectangleLines(0, 0, 640, 640, gridColor);
+        }
+
+        EndTextureMode();
+
+        BeginDrawing();
         ClearBackground({State.backgroundColor[0] * 255.0f, State.backgroundColor[1] * 255.0f, State.backgroundColor[2] * 255.0f, 255});
         BeginMode3D(State.camera);
-        //DrawModel(State.isSlim ? State.slimModel : State.classicModel, position, 1.0f, WHITE);
 
+        // dinnerbone easter egg
         Matrix transform = MatrixScale(1, 1, 1);
         std::string tmpUsername = State.loadedSkin.path;
         std::transform(tmpUsername.begin(), tmpUsername.end(), tmpUsername.begin(), ::tolower);
@@ -134,22 +158,21 @@ int main(int argc, char* argv[])
             transform = MatrixRotateZ(PI);
             position.y = height;
         }
+
+        // draw the skin
         transform = MatrixMultiply(transform, MatrixTranslate(position.x, position.y, position.z));
         for (int i = 0; i < 12; i++) {
             if (!State.enabledMeshes[i]) continue;
             int matIndex = (State.isSlim ? State.slimModel : State.classicModel).meshMaterial[i];
-            DrawMesh( (State.isSlim ? State.slimModel : State.classicModel).meshes[i],  (State.isSlim ? State.slimModel : State.classicModel).materials[matIndex], transform);
+            DrawMesh((State.isSlim ? State.slimModel : State.classicModel).meshes[i],  (State.isSlim ? State.slimModel : State.classicModel).materials[matIndex], transform);
         }
 
-        DrawGrid(10, 1.0f);
+        if (State.enableGrid) DrawGrid(10, 1.0f);
+
         EndMode3D();
-
         rlImGuiBegin();
-
         UserInterface::RunUI();
-
         rlImGuiEnd();
-
         EndDrawing();
     }
     UnloadModel(State.classicModel);
