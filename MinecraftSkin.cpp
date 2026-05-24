@@ -1,5 +1,5 @@
 #define CPPHTTPLIB_OPENSSL_SUPPORT
-#include "MinecraftSkin.h"
+
 #include "httplib.h"
 #include "json.hpp"
 #include "base64.hpp"
@@ -152,6 +152,12 @@ bool MinecraftSkin::LoadSkinFromMinecraft(const std::string username) {
 
         buffer = nlohmann::json::parse(result->body);
 
+        if (buffer.contains("name") && buffer["name"].is_string()) {
+            std::memset(State.username, 0, sizeof(State.username));
+            std::strncpy(State.username, buffer["name"].get<std::string>().c_str(), sizeof(State.username) - 1);
+            State.username[sizeof(State.username) - 1] = '\0';
+        }
+
         if (!buffer.contains("properties") || !buffer["properties"].is_array()) return false;
         nlohmann::json properties = buffer["properties"][0];
 
@@ -177,9 +183,9 @@ bool MinecraftSkin::LoadSkinFromMinecraft(const std::string username) {
 
     bool loadResult = LoadSkinFromURL(skinObject["url"].get<std::string>());
     if (!loadResult) return false;
-    SetWindowTitle(std::string("Skin viewer | " + username).c_str());
+    SetWindowTitle(std::string("Skin viewer | " + std::string(State.username)).c_str());
     State.loadedSkin.source = SkinSource_Minecraft;
-    State.loadedSkin.path = username;
+    State.loadedSkin.path = State.username;
 
     return true;
 }

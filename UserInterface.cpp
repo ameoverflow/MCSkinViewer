@@ -171,9 +171,6 @@ void RunAboutPopup() {
 
 void RunTextureWindow() {
     if (showTextureWindow) {
-        ImGui::SetNextWindowPos(ImVec2(20,551), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
-
         ImGui::Begin("Currently loaded skin", &showTextureWindow);
 
         ImVec2 availableSpace = ImGui::GetContentRegionAvail();
@@ -212,9 +209,7 @@ void RunTextureWindow() {
 
 void RunCameraWindow() {
     if (showCameraWindow) {
-        ImGui::SetNextWindowPos(ImVec2(1295, 428), ImGuiCond_FirstUseEver);
-
-        ImGui::Begin("Camera and environment properties", &showCameraWindow, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
+        ImGui::Begin("Environment properties", &showCameraWindow, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
 
         ImGui::Text("Camera coordinates: ");
         ImGui::Text("%f %f %f", State.camera.position.x, State.camera.position.y, State.camera.position.z);
@@ -250,9 +245,6 @@ void RunCameraWindow() {
 
 void RunModelPropertiesWindow() {
     if (showMeshWindow) {
-        ImGui::SetNextWindowPos(ImVec2(20, 45), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(234, 360), ImGuiCond_FirstUseEver);
-
         ImGui::Begin("Model properties", &showMeshWindow, ImGuiWindowFlags_NoResize);
 
         ImGui::Checkbox("Use slim model", &State.isSlim);
@@ -262,19 +254,39 @@ void RunModelPropertiesWindow() {
         ImGui::Separator();
         ImGui::Spacing();
 
-        ImGui::Text("Toggle body parts: ");
-        ImGui::Checkbox("Head", &State.enabledMeshes[0]);
-        ImGui::Checkbox("Body", &State.enabledMeshes[2]);
-        ImGui::Checkbox("Left arm", &State.enabledMeshes[6]);
-        ImGui::Checkbox("Right arm", &State.enabledMeshes[4]);
-        ImGui::Checkbox("Left leg", &State.enabledMeshes[10]);
-        ImGui::Checkbox("Right leg", &State.enabledMeshes[8]);
-        ImGui::Checkbox("Hat", &State.enabledMeshes[1]);
-        ImGui::Checkbox("Outer body", &State.enabledMeshes[3]);
-        ImGui::Checkbox("Outer left arm", &State.enabledMeshes[7]);
-        ImGui::Checkbox("Outer right arm", &State.enabledMeshes[5]);
-        ImGui::Checkbox("Outer left leg", &State.enabledMeshes[11]);
-        ImGui::Checkbox("Outer right leg", &State.enabledMeshes[9]);
+        if (ImGui::TreeNode("Model")) {
+            if (ImGui::TreeNode("Head")) {
+                ImGui::Checkbox("Head", &State.enabledMeshes[0]);
+                ImGui::Checkbox("Hat", &State.enabledMeshes[1]);
+                ImGui::TreePop();
+            }
+            if (ImGui::TreeNode("Body")) {
+                ImGui::Checkbox("Body", &State.enabledMeshes[2]);
+                if (!State.loadedSkin.isOldType) ImGui::Checkbox("Body Layer", &State.enabledMeshes[3]);
+                ImGui::TreePop();
+            }
+            if (ImGui::TreeNode("Right Arm")) {
+                ImGui::Checkbox("Right Arm", &State.enabledMeshes[4]);
+                if (!State.loadedSkin.isOldType) ImGui::Checkbox("Right Arm Layer", &State.enabledMeshes[5]);
+                ImGui::TreePop();
+            }
+            if (ImGui::TreeNode("Left Arm")) {
+                ImGui::Checkbox("Left Arm", &State.enabledMeshes[6]);
+                if (!State.loadedSkin.isOldType) ImGui::Checkbox("Left Arm Layer", &State.enabledMeshes[7]);
+                ImGui::TreePop();
+            }
+            if (ImGui::TreeNode("Right Leg")) {
+                ImGui::Checkbox("Right Leg", &State.enabledMeshes[8]);
+                if (!State.loadedSkin.isOldType) ImGui::Checkbox("Right Leg Layer", &State.enabledMeshes[9]);
+                ImGui::TreePop();
+            }
+            if (ImGui::TreeNode("Left Leg")) {
+                ImGui::Checkbox("Left Leg", &State.enabledMeshes[10]);
+                if (!State.loadedSkin.isOldType) ImGui::Checkbox("Left Leg Layer", &State.enabledMeshes[11]);
+                ImGui::TreePop();
+            }
+            ImGui::TreePop();
+        }
 
         ImGui::End();
     }

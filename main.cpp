@@ -9,10 +9,38 @@
 #include "MinecraftSkin.h"
 #include "State.h"
 #include "UserInterface.h"
+#include "imgui_internal.h"
 
 Vector3 position = { 0.0f, 0.0f, 0.0f };
 RenderTexture skinRender;
-Color gridColor = {128, 128, 128, 128};
+Color gridColor = {128, 128, 128, 255};
+
+RenderTexture2D viewportTarget;
+ImVec2 mainWindowSize;
+
+void SetupDefaultDockLayout(ImGuiID mainDockspaceId) {
+    ImGui::DockBuilderRemoveNode(mainDockspaceId);
+    ImGui::DockBuilderAddNode(mainDockspaceId, ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_DockSpace);
+
+    ImGui::DockBuilderSetNodeSize(mainDockspaceId, ImGui::GetMainViewport()->WorkSize);
+
+    ImGuiID dockIdLeft;
+    ImGuiID dockIdRemaining;
+    ImGuiID dockIdRight;
+    ImGuiID dockIdBottomRight;
+
+    ImGui::DockBuilderSplitNode(mainDockspaceId, ImGuiDir_Left, 0.15f, &dockIdLeft, &dockIdRemaining);
+    ImGui::DockBuilderSplitNode(dockIdRemaining, ImGuiDir_Right, 0.25f, &dockIdRight, &dockIdRemaining);
+    ImGui::DockBuilderSplitNode(dockIdRight, ImGuiDir_Down, 0.35f, &dockIdBottomRight, &dockIdRight);
+
+    ImGui::DockBuilderDockWindow("Model properties", dockIdLeft);
+    ImGui::DockBuilderDockWindow("Currently loaded skin", dockIdBottomRight);
+    ImGui::DockBuilderDockWindow("Environment properties", dockIdRight);
+
+    ImGui::DockBuilderDockWindow("3D viewport", dockIdRemaining);
+
+    ImGui::DockBuilderFinish(mainDockspaceId);
+}
 
 int main(int argc, char* argv[])
 {
@@ -21,6 +49,8 @@ int main(int argc, char* argv[])
     SetExitKey(0);
 
     rlImGuiSetup(true);
+
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
     State.camera = { 0 };
     State.camera.position = (Vector3){ 3.0f, 3.0f, -3.0f };
@@ -52,6 +82,7 @@ int main(int argc, char* argv[])
     Image alexSkin = LoadImageFromMemory(".png", (const unsigned char*)alexTextureData.data(), (int)alexTextureData.size());
 
     skinRender = LoadRenderTexture(640, 640);
+    viewportTarget = LoadRenderTexture(1920, 1080);
 
     State.steveSkin = MinecraftSkin::LoadSkinIntoStruct(steveSkin);
     State.alexSkin = MinecraftSkin::LoadSkinIntoStruct(alexSkin);
@@ -106,13 +137,7 @@ int main(int argc, char* argv[])
             UnloadDroppedFiles(list);
         }
 
-        if (!IsCursorHidden()) {
-            if (IsCursorOnScreen() && !ImGui::GetIO().WantCaptureMouse) {
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                    DisableCursor();
-                }
-            }
-        } else {
+        if (IsCursorHidden()) {
             UpdateCamera(&State.camera, CAMERA_FREE);
 
             if (IsKeyPressed(KEY_ESCAPE)) {
@@ -143,35 +168,74 @@ int main(int argc, char* argv[])
 
         EndTextureMode();
 
+        if (mainWindowSize.x < 1) mainWindowSize.x = 1;
+        if (mainWindowSize.y < 1) mainWindowSize.y = 1;
+
+        if ((int)mainWindowSize.x != viewportTarget.texture.width ||
+            (int)mainWindowSize.y != viewportTarget.texture.height)
+        {
+            UnloadRenderTexture(viewportTarget);
+            viewportTarget = LoadRenderTexture((int)mainWindowSize.x, (int)mainWindowSize.y);
+        }
+
+        BeginTextureMode(viewportTarget);
+
+            ClearBackground({State.backgroundColor[0] * 255.0f, State.backgroundColor[1] * 255.0f, State.backgroundColor[2] * 255.0f, 255});
+            BeginMode3D(State.camera);
+
+            // dinnerbone easter egg
+            Matrix transform = MatrixScale(1, 1, 1);
+            if (State.loadedSkin.source == SkinSource_Minecraft && State.loadedSkin.path == "Dinnerbone") {
+                BoundingBox box = GetModelBoundingBox(State.isSlim ? State.slimModel : State.classicModel);
+                float height = box.max.y - box.min.y;
+                transform = MatrixRotateX(PI);
+                transform = MatrixRotateZ(PI);
+                position.y = height;
+            } else {
+                position.y = 0;
+            }
+
+            // draw the skin
+            transform = MatrixMultiply(transform, MatrixTranslate(position.x, position.y, position.z));
+            for (int i = 0; i < 12; i++) {
+                if (!State.enabledMeshes[i]) continue;
+                int matIndex = (State.isSlim ? State.slimModel : State.classicModel).meshMaterial[i];
+                DrawMesh((State.isSlim ? State.slimModel : State.classicModel).meshes[i],  (State.isSlim ? State.slimModel : State.classicModel).materials[matIndex], transform);
+            }
+
+            if (State.enableGrid) DrawGrid(10, 1.0f);
+
+            EndMode3D();
+
+        EndTextureMode();
+
         BeginDrawing();
-        ClearBackground({State.backgroundColor[0] * 255.0f, State.backgroundColor[1] * 255.0f, State.backgroundColor[2] * 255.0f, 255});
-        BeginMode3D(State.camera);
-
-        // dinnerbone easter egg
-        Matrix transform = MatrixScale(1, 1, 1);
-        std::string tmpUsername = State.loadedSkin.path;
-        std::transform(tmpUsername.begin(), tmpUsername.end(), tmpUsername.begin(), ::tolower);
-        if (State.loadedSkin.source == SkinSource_Minecraft && tmpUsername == "dinnerbone") {
-            BoundingBox box = GetModelBoundingBox(State.isSlim ? State.slimModel : State.classicModel);
-            float height = box.max.y - box.min.y;
-            transform = MatrixRotateX(PI);
-            transform = MatrixRotateZ(PI);
-            position.y = height;
-        }
-
-        // draw the skin
-        transform = MatrixMultiply(transform, MatrixTranslate(position.x, position.y, position.z));
-        for (int i = 0; i < 12; i++) {
-            if (!State.enabledMeshes[i]) continue;
-            int matIndex = (State.isSlim ? State.slimModel : State.classicModel).meshMaterial[i];
-            DrawMesh((State.isSlim ? State.slimModel : State.classicModel).meshes[i],  (State.isSlim ? State.slimModel : State.classicModel).materials[matIndex], transform);
-        }
-
-        if (State.enableGrid) DrawGrid(10, 1.0f);
-
-        EndMode3D();
         rlImGuiBegin();
+
+        ImGuiID mainDockspaceId = ImGui::DockSpaceOverViewport();
+
+        static bool isLayoutInitialized = false;
+        if (!isLayoutInitialized) {
+            SetupDefaultDockLayout(mainDockspaceId);
+            isLayoutInitialized = true;
+        }
+
         UserInterface::RunUI();
+
+        if (ImGui::Begin("3D viewport")) {
+            mainWindowSize = ImGui::GetContentRegionAvail();
+
+            if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                ImGui::SetWindowFocus();
+                DisableCursor();
+            }
+
+            Rectangle sourceRec = { 0.0f, 0.0f, (float)viewportTarget.texture.width, -(float)viewportTarget.texture.height };
+            rlImGuiImageRect(&viewportTarget.texture, (int)mainWindowSize.x, (int)mainWindowSize.y, sourceRec);
+
+            ImGui::End();
+        }
+
         rlImGuiEnd();
         EndDrawing();
     }
