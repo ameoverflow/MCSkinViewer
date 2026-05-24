@@ -10,12 +10,12 @@
 #include "State.h"
 #include "UserInterface.h"
 #include "imgui_internal.h"
+#include "Renderer.h"
 
-Vector3 position = { 0.0f, 0.0f, 0.0f };
 RenderTexture skinRender;
 Color gridColor = {128, 128, 128, 255};
 
-RenderTexture2D viewportTarget;
+RenderTexture viewportTarget;
 ImVec2 mainWindowSize;
 
 void SetupDefaultDockLayout(ImGuiID mainDockspaceId) {
@@ -34,8 +34,9 @@ void SetupDefaultDockLayout(ImGuiID mainDockspaceId) {
     ImGui::DockBuilderSplitNode(dockIdRight, ImGuiDir_Down, 0.35f, &dockIdBottomRight, &dockIdRight);
 
     ImGui::DockBuilderDockWindow("Model properties", dockIdLeft);
-    ImGui::DockBuilderDockWindow("Currently loaded skin", dockIdBottomRight);
+    ImGui::DockBuilderDockWindow("Texture", dockIdBottomRight);
     ImGui::DockBuilderDockWindow("Environment properties", dockIdRight);
+    ImGui::DockBuilderDockWindow("Render", dockIdBottomRight);
 
     ImGui::DockBuilderDockWindow("3D viewport", dockIdRemaining);
 
@@ -154,18 +155,6 @@ int main(int argc, char* argv[])
             DrawTexturePro(State.loadedSkin.texture, {0, 0, 64, -64}, {0, 0, 640, 640}, {0, 0}, 0, WHITE);
         }
 
-        if (State.enableSkinGrid) {
-            for (int x = 0; x <= 640; x += 10) {
-                DrawLine(x, 0, x, 640, gridColor);
-            }
-
-            for (int y = 0; y <= 640; y += 10) {
-                DrawLine(0, y, 640, y, gridColor);
-            }
-
-            DrawRectangleLines(0, 0, 640, 640, gridColor);
-        }
-
         EndTextureMode();
 
         if (mainWindowSize.x < 1) mainWindowSize.x = 1;
@@ -180,32 +169,7 @@ int main(int argc, char* argv[])
 
         BeginTextureMode(viewportTarget);
 
-            ClearBackground({State.backgroundColor[0] * 255.0f, State.backgroundColor[1] * 255.0f, State.backgroundColor[2] * 255.0f, 255});
-            BeginMode3D(State.camera);
-
-            // dinnerbone easter egg
-            Matrix transform = MatrixScale(1, 1, 1);
-            if (State.loadedSkin.source == SkinSource_Minecraft && State.loadedSkin.path == "Dinnerbone") {
-                BoundingBox box = GetModelBoundingBox(State.isSlim ? State.slimModel : State.classicModel);
-                float height = box.max.y - box.min.y;
-                transform = MatrixRotateX(PI);
-                transform = MatrixRotateZ(PI);
-                position.y = height;
-            } else {
-                position.y = 0;
-            }
-
-            // draw the skin
-            transform = MatrixMultiply(transform, MatrixTranslate(position.x, position.y, position.z));
-            for (int i = 0; i < 12; i++) {
-                if (!State.enabledMeshes[i]) continue;
-                int matIndex = (State.isSlim ? State.slimModel : State.classicModel).meshMaterial[i];
-                DrawMesh((State.isSlim ? State.slimModel : State.classicModel).meshes[i],  (State.isSlim ? State.slimModel : State.classicModel).materials[matIndex], transform);
-            }
-
-            if (State.enableGrid) DrawGrid(10, 1.0f);
-
-            EndMode3D();
+        Renderer::RenderSkin(State.enableGrid);
 
         EndTextureMode();
 

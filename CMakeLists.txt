@@ -14,10 +14,13 @@ set(SOURCES
         UserInterface.cpp
         main.cpp
         FileSystem.cpp
+        Renderer.cpp
+        Renderer.cpp
+        Renderer.h
 )
 
 add_executable(SkinViewer ${SOURCES})
 
 target_include_directories(SkinViewer PRIVATE include imgui rlimgui/extras)
 target_link_libraries(SkinViewer PRIVATE ssl crypto raylib)
-target_compile_definitions(SkinViewer PRIVATE VERSION="0.1")
+target_compile_definitions(SkinViewer PRIVATE VERSION="0.2")

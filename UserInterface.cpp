@@ -11,15 +11,20 @@
 #include "State.h"
 #include "rlimgui/rlImGui.h"
 #include "portable-file-dialogs.h"
+#include "Renderer.h"
 
-bool invalidFilePopup, invalidTexturePopup;
+bool invalidFilePopup, invalidTexturePopup, renderedPopup, couldntSaveImagePopup, invalidPathPopup;
 bool aboutPopup, minecraftSkinPopup, urlPopup, pngPopup, saveFilePopup;
 bool showCameraWindow = true;
 bool showTextureWindow = true;
 bool showMeshWindow = true;
+bool showRenderWindow = true;
+
 char saveFilePath[256] = "";
 bool openFileOnSave;
-std::string savePathString;
+
+char renderFilePath[256] = "";
+int renderResolution[2] = {1920, 1080};
 
 void UserInterface::ShowInvalidFilePopup() {
     invalidFilePopup = true;
@@ -94,10 +99,14 @@ void RunFileBrowser() {
         }
 
         if (ImGui::Button("Open", ImVec2(64, 0)) || inputSubmitted) {
-            if (!MinecraftSkin::LoadSkinFromPNG(std::string(State.skinPath))) {
-                UserInterface::ShowInvalidTexturePopup();
+            if (IsFileNameValid(renderFilePath)) {
+                if (!MinecraftSkin::LoadSkinFromPNG(std::string(State.skinPath))) {
+                    UserInterface::ShowInvalidTexturePopup();
+                }
+                ImGui::CloseCurrentPopup();
+            } else {
+                invalidPathPopup = true;
             }
-            ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(64, 0))) {
@@ -132,11 +141,14 @@ void RunSavePopup() {
 
         if (ImGui::Button("Save", ImVec2(64, 0)) || inputSubmitted) {
             Image output = LoadImageFromTexture(State.loadedSkin.original);
-            ExportImage(output, saveFilePath);
-            if (openFileOnSave) {
-                if (!MinecraftSkin::LoadSkinFromPNG(std::string(saveFilePath))) {
-                    UserInterface::ShowInvalidTexturePopup();
+            if (ExportImage(output, saveFilePath)) {
+                if (openFileOnSave) {
+                    if (!MinecraftSkin::LoadSkinFromPNG(std::string(saveFilePath))) {
+                        UserInterface::ShowInvalidTexturePopup();
+                    }
                 }
+            } else {
+                invalidPathPopup = true;
             }
             ImGui::CloseCurrentPopup();
         }
@@ -171,7 +183,7 @@ void RunAboutPopup() {
 
 void RunTextureWindow() {
     if (showTextureWindow) {
-        ImGui::Begin("Currently loaded skin", &showTextureWindow);
+        ImGui::Begin("Texture", &showTextureWindow);
 
         ImVec2 availableSpace = ImGui::GetContentRegionAvail();
 
@@ -248,7 +260,6 @@ void RunModelPropertiesWindow() {
         ImGui::Begin("Model properties", &showMeshWindow, ImGuiWindowFlags_NoResize);
 
         ImGui::Checkbox("Use slim model", &State.isSlim);
-        ImGui::Checkbox("Enable grid", &State.enableSkinGrid);
 
         ImGui::Spacing();
         ImGui::Separator();
@@ -293,6 +304,37 @@ void RunModelPropertiesWindow() {
     }
 }
 
+void RunRenderWindow() {
+    if (showRenderWindow) {
+        ImGui::Begin("Render", &showRenderWindow, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
+
+        ImGui::Text("Render resolution:");
+        ImGui::InputInt2("", renderResolution, 0);
+
+        ImGui::InputText(" Path", renderFilePath, sizeof(renderFilePath));
+        if (pfd::settings::available() && ImGui::Button("...", ImVec2(32, 0))) {
+            auto f = pfd::save_file("Select save location", pfd::path::home(),
+                            { "PNG images (*.png)", "*.png" });
+
+            if (!f.result().empty()) {
+                std::memset(renderFilePath, 0, sizeof(renderFilePath));
+                std::strncpy(renderFilePath, f.result().c_str(), sizeof(renderFilePath) - 1);
+                renderFilePath[sizeof(renderFilePath) - 1] = '\0';
+            }
+        }
+
+        if (ImGui::Button("Render", ImVec2(64, 0))) {
+            if (Renderer::RenderToFile(renderFilePath, renderResolution[0], renderResolution[1])) {
+                renderedPopup = true;
+            } else {
+                couldntSaveImagePopup = true;
+            }
+        }
+
+        ImGui::End();
+    }
+}
+
 void UserInterface::RunUI() {
     if (invalidFilePopup) {
         ImGui::OpenPopup("Invalid file");
@@ -302,6 +344,21 @@ void UserInterface::RunUI() {
     if (invalidTexturePopup) {
         ImGui::OpenPopup("Invalid texture");
         invalidTexturePopup = false;
+    }
+
+    if (couldntSaveImagePopup) {
+        ImGui::OpenPopup("Could not save image");
+        couldntSaveImagePopup = false;
+    }
+
+    if (invalidPathPopup) {
+        ImGui::OpenPopup("Invalid path");
+        invalidPathPopup = false;
+    }
+
+    if (renderedPopup) {
+        ImGui::OpenPopup("Rendered successfully");
+        renderedPopup = false;
     }
 
     if (ImGui::BeginMainMenuBar()) {
@@ -321,7 +378,8 @@ void UserInterface::RunUI() {
         if (ImGui::BeginMenu("View")) {
             if (ImGui::MenuItem("Camera and environment properties...", "Ctrl+1")) showCameraWindow = true;
             if (ImGui::MenuItem("Model properties...", "Ctrl+2")) showMeshWindow = true;
-            if (ImGui::MenuItem("View currently loaded skin...", "Ctrl+3")) showTextureWindow = true;
+            if (ImGui::MenuItem("View texture...", "Ctrl+3")) showTextureWindow = true;
+            if (ImGui::MenuItem("View render options...", "Ctrl+4")) showRenderWindow = true;
             ImGui::EndMenu();
         }
         if (ImGui::MenuItem("Reload (Ctrl+R)")) State.needsReload = true;
@@ -402,6 +460,7 @@ void UserInterface::RunUI() {
         if (IsKeyPressed(KEY_ONE)) showCameraWindow = !showCameraWindow;
         if (IsKeyPressed(KEY_TWO)) showMeshWindow = !showMeshWindow;
         if (IsKeyPressed(KEY_THREE)) showTextureWindow = !showTextureWindow;
+        if (IsKeyPressed(KEY_FOUR)) showRenderWindow = !showRenderWindow;
     }
 
     RunMinecraftSkinPopup();
@@ -412,6 +471,7 @@ void UserInterface::RunUI() {
     RunFileBrowser();
     RunModelPropertiesWindow();
     RunSavePopup();
+    RunRenderWindow();
 
     if (ImGui::BeginPopupModal("Invalid file", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text("Provided file is invalid. It needs to be a .png file.");
@@ -423,6 +483,33 @@ void UserInterface::RunUI() {
 
     if (ImGui::BeginPopupModal("Invalid texture", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text("Texture must be 64x64 or 64x32.");
+        if (ImGui::Button("OK", ImVec2(64, 0))) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+
+    if (ImGui::BeginPopupModal("Could not save image", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Image could not be exported. Check the save path.");
+        if (ImGui::Button("OK", ImVec2(64, 0))) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+
+    if (ImGui::BeginPopupModal("Invalid path", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Invalid file path, double check the path.");
+        if (ImGui::Button("OK", ImVec2(64, 0))) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+
+    if (ImGui::BeginPopupModal("Rendered successfully", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Image was rendered successfully.");
         if (ImGui::Button("OK", ImVec2(64, 0))) {
             ImGui::CloseCurrentPopup();
         }

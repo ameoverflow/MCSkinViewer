@@ -14,15 +14,18 @@ struct AppState {
     char username[17] = "";
     char url[256] = "";
     char skinPath[256] = "";
+
     Skin loadedSkin;
     Camera camera;
     Model classicModel, slimModel;
     Skin steveSkin, alexSkin;
+
     bool quit;
+
     float backgroundColor[3] = {0.1f, 0.1f, 0.1f};
     float cameraFov = 45.0f;
-    bool enableSkinGrid;
     bool enableGrid = true;
+
     std::unique_ptr<filewatch::FileWatch<std::string>> watch = nullptr;
     std::atomic<bool> needsReload = false;
     bool hotReloadEnabled = true;
