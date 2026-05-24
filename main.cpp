@@ -29,8 +29,8 @@ void SetupDefaultDockLayout(ImGuiID mainDockspaceId) {
     ImGuiID dockIdRight;
     ImGuiID dockIdBottomRight;
 
-    ImGui::DockBuilderSplitNode(mainDockspaceId, ImGuiDir_Left, 0.15f, &dockIdLeft, &dockIdRemaining);
-    ImGui::DockBuilderSplitNode(dockIdRemaining, ImGuiDir_Right, 0.25f, &dockIdRight, &dockIdRemaining);
+    ImGui::DockBuilderSplitNode(mainDockspaceId, ImGuiDir_Left, 0.17f, &dockIdLeft, &dockIdRemaining);
+    ImGui::DockBuilderSplitNode(dockIdRemaining, ImGuiDir_Right, 0.20f, &dockIdRight, &dockIdRemaining);
     ImGui::DockBuilderSplitNode(dockIdRight, ImGuiDir_Down, 0.35f, &dockIdBottomRight, &dockIdRight);
 
     ImGui::DockBuilderDockWindow("Model properties", dockIdLeft);
@@ -225,13 +225,13 @@ int main(int argc, char* argv[])
         if (ImGui::Begin("3D viewport")) {
             mainWindowSize = ImGui::GetContentRegionAvail();
 
-            if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            Rectangle sourceRec = { 0.0f, 0.0f, (float)viewportTarget.texture.width, -(float)viewportTarget.texture.height };
+            rlImGuiImageRect(&viewportTarget.texture, (int)mainWindowSize.x, (int)mainWindowSize.y, sourceRec);
+
+            if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                 ImGui::SetWindowFocus();
                 DisableCursor();
             }
-
-            Rectangle sourceRec = { 0.0f, 0.0f, (float)viewportTarget.texture.width, -(float)viewportTarget.texture.height };
-            rlImGuiImageRect(&viewportTarget.texture, (int)mainWindowSize.x, (int)mainWindowSize.y, sourceRec);
 
             ImGui::End();
         }

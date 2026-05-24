@@ -254,6 +254,7 @@ void RunModelPropertiesWindow() {
         ImGui::Separator();
         ImGui::Spacing();
 
+        ImGui::SetNextItemOpen(true, ImGuiCond_Once);
         if (ImGui::TreeNode("Model")) {
             if (ImGui::TreeNode("Head")) {
                 ImGui::Checkbox("Head", &State.enabledMeshes[0]);
